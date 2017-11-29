@@ -1,0 +1,89 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg viewBox="0 0 1024 812" xmlns="http://www.w3.org/2000/svg" xmlns:inkspace="http://www.inkscape.org/namespaces/inkscape" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs id="defs_block">
+    <filter height="1.504" id="filter_blur" inkspace:collect="always" width="1.1575" x="-0.07875" y="-0.252">
+      <feGaussianBlur id="feGaussianBlur3780" inkspace:collect="always" stdDeviation="4.2" />
+    </filter>
+  </defs>
+  <title>blockdiag</title>
+  <desc>seqdiag {
+
+=== Transmit ===
+  Pod -&gt; veth0 [label = "TX pod namespace"];
+  veth0 -&gt; vethX [label = "TX default namespace"];
+  vethX -&gt; "boot ENI" [label = "forward to eth0"];
+  "boot ENI" -&gt; Internet [label = "source NAT"];
+=== Receive ===
+  "boot ENI" &lt;-- Internet;
+  vethX &lt;-- "boot ENI" [label = "remove NAT, forward to Pod"];
+  veth0 &lt;-- vethX [label = "RX default namespace"];
+  Pod &lt;-- veth0 [label = "RX pod namespace"];
+}
+</desc>
+  <rect fill="rgb(0,0,0)" height="664" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="8" x="127" y="126" />
+  <rect fill="rgb(0,0,0)" height="522" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="8" x="319" y="222" />
+  <rect fill="rgb(0,0,0)" height="390" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="8" x="511" y="288" />
+  <rect fill="rgb(0,0,0)" height="260" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="8" x="703" y="352" />
+  <rect fill="rgb(0,0,0)" height="130" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="8" x="895" y="416" />
+  <rect fill="rgb(0,0,0)" height="40" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="128" x="67" y="46" />
+  <rect fill="rgb(0,0,0)" height="40" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="128" x="259" y="46" />
+  <rect fill="rgb(0,0,0)" height="40" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="128" x="451" y="46" />
+  <rect fill="rgb(0,0,0)" height="40" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="128" x="643" y="46" />
+  <rect fill="rgb(0,0,0)" height="40" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="128" x="835" y="46" />
+  <path d="M 128 80 L 128 800" fill="none" stroke="rgb(0,0,0)" stroke-dasharray="8 4" />
+  <rect fill="moccasin" height="664" stroke="rgb(0,0,0)" width="8" x="124" y="120" />
+  <path d="M 320 80 L 320 800" fill="none" stroke="rgb(0,0,0)" stroke-dasharray="8 4" />
+  <rect fill="moccasin" height="522" stroke="rgb(0,0,0)" width="8" x="316" y="216" />
+  <path d="M 512 80 L 512 800" fill="none" stroke="rgb(0,0,0)" stroke-dasharray="8 4" />
+  <rect fill="moccasin" height="390" stroke="rgb(0,0,0)" width="8" x="508" y="282" />
+  <path d="M 704 80 L 704 800" fill="none" stroke="rgb(0,0,0)" stroke-dasharray="8 4" />
+  <rect fill="moccasin" height="260" stroke="rgb(0,0,0)" width="8" x="700" y="346" />
+  <path d="M 896 80 L 896 800" fill="none" stroke="rgb(0,0,0)" stroke-dasharray="8 4" />
+  <rect fill="moccasin" height="130" stroke="rgb(0,0,0)" width="8" x="892" y="410" />
+  <rect fill="rgb(255,255,255)" height="40" stroke="rgb(0,0,0)" width="128" x="64" y="40" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="19" x="128" y="65">Pod</text>
+  <rect fill="rgb(255,255,255)" height="40" stroke="rgb(0,0,0)" width="128" x="256" y="40" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="29" x="320" y="65">veth0</text>
+  <rect fill="rgb(255,255,255)" height="40" stroke="rgb(0,0,0)" width="128" x="448" y="40" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="30" x="512" y="65">vethX</text>
+  <rect fill="rgb(255,255,255)" height="40" stroke="rgb(0,0,0)" width="128" x="640" y="40" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="42" x="704" y="65">boot ENI</text>
+  <rect fill="rgb(255,255,255)" height="40" stroke="rgb(0,0,0)" width="128" x="832" y="40" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="38" x="896" y="65">Internet</text>
+  <path d="M 136 216 L 312 216" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="304,212 312,216 304,220" stroke="rgb(0,0,0)" />
+  <path d="M 328 282 L 504 282" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="496,278 504,282 496,286" stroke="rgb(0,0,0)" />
+  <path d="M 520 346 L 696 346" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="688,342 696,346 688,350" stroke="rgb(0,0,0)" />
+  <path d="M 712 410 L 888 410" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="880,406 888,410 880,414" stroke="rgb(0,0,0)" />
+  <path d="M 712 540 L 888 540" fill="none" stroke="rgb(0,0,0)" stroke-dasharray="4" />
+  <polygon fill="rgb(0,0,0)" points="720,536 712,540 720,544" stroke="rgb(0,0,0)" />
+  <path d="M 520 606 L 696 606" fill="none" stroke="rgb(0,0,0)" stroke-dasharray="4" />
+  <polygon fill="rgb(0,0,0)" points="528,602 520,606 528,610" stroke="rgb(0,0,0)" />
+  <path d="M 328 672 L 504 672" fill="none" stroke="rgb(0,0,0)" stroke-dasharray="4" />
+  <polygon fill="rgb(0,0,0)" points="336,668 328,672 336,676" stroke="rgb(0,0,0)" />
+  <path d="M 136 738 L 312 738" fill="none" stroke="rgb(0,0,0)" stroke-dasharray="4" />
+  <polygon fill="rgb(0,0,0)" points="144,734 136,738 144,742" stroke="rgb(0,0,0)" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="98" x="189" y="214">TX pod namespace</text>
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="114" x="389" y="280">TX default namespace</text>
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="80" x="564" y="344">forward to eth0</text>
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="60" x="746" y="408">source NAT</text>
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="148" x="622" y="604">remove NAT, forward to Pod</text>
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="114" x="447" y="670">RX default namespace</text>
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="98" x="263" y="736">RX pod namespace</text>
+  <path d="M 40 138 L 480 138" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 40 142 L 480 142" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 544 138 L 984 138" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 544 142 L 984 142" fill="none" stroke="rgb(0,0,0)" />
+  <rect fill="rgb(208,208,208)" height="18" stroke="rgb(0,0,0)" width="64" x="480" y="131" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="44" x="512" y="145">Transmit</text>
+  <path d="M 40 478 L 482 478" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 40 482 L 482 482" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 541 478 L 984 478" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 541 482 L 984 482" fill="none" stroke="rgb(0,0,0)" />
+  <rect fill="rgb(208,208,208)" height="18" stroke="rgb(0,0,0)" width="59" x="482" y="471" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="39" x="511" y="485">Receive</text>
+</svg>
