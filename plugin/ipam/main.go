@@ -30,9 +30,9 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 
-	"github.com/lyft/cni-eni"
-	"github.com/lyft/cni-eni/aws"
-	"github.com/lyft/cni-eni/nl"
+	"github.com/lyft/cni-ipvlan-vpc-k8s"
+	"github.com/lyft/cni-ipvlan-vpc-k8s/aws"
+	"github.com/lyft/cni-ipvlan-vpc-k8s/nl"
 )
 
 // PluginConf contains configuration parameters
@@ -86,7 +86,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	var alloc *aws.AllocationResult
 	// Try to find a free IP first - possibly from a broken container,
 	// or torn down namespace.
-	free, err := cnieni.FindFreeIPsAtIndex(conf.IPAM.IfaceIndex)
+	free, err := cniipvlanvpck8s.FindFreeIPsAtIndex(conf.IPAM.IfaceIndex)
 	if err == nil && len(free) > 0 {
 		alloc = free[0]
 	} else {
@@ -188,5 +188,5 @@ func main() {
 		skel.PluginMain(cmdAdd, cmdDel, version.PluginSupports(version.Current()))
 		return nil
 	}
-	_ = cnieni.LockfileRun(run)
+	_ = cniipvlanvpck8s.LockfileRun(run)
 }
