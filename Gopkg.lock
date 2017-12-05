@@ -73,12 +73,6 @@
   revision = "0b12d6b5"
 
 [[projects]]
-  name = "github.com/lyft/cni-eni"
-  packages = [".","aws","nl"]
-  revision = "92d31adf26639a355e42da450cc217d5556ba507"
-  version = "v0.1.6"
-
-[[projects]]
   branch = "master"
   name = "github.com/nightlyone/lockfile"
   packages = ["."]
@@ -123,6 +117,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3696228231c4a5a5a7c91295918f634cffcfd4b14093760ad8f6bee95ae726fa"
+  inputs-digest = "54cde6336808d285f98085f27e8b25e1aab2580a2cd65cfbeb50b09536d3dadb"
   solver-name = "gps-cdcl"
   solver-version = 1
