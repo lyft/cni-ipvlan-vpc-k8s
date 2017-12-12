@@ -2,6 +2,8 @@
 .idea
 .vscode
 vendor/
+vendor.orig/
+
 cni-ipvlan-vpc-k8s-*
 *.tar.gz
 

@@ -1,5 +1,5 @@
 NAME=cni-ipvlan-vpc-k8s
-VERSION:=$(shell git describe)
+VERSION:=$(shell git describe --tags)
 DOCKER_IMAGE=lyft/cni-ipvlan-vpc-k8s:$(VERSION)
 DEP:= $(shell command -v dep 2> /dev/null || $(GOPATH)/bin/dep)
 
@@ -28,7 +28,7 @@ lint:
 .PHONY: test
 test: dep cache lint
 ifndef GOOS
-	go test -v ./aws
+	go test -v ./aws ./nl
 else
 	@echo Tests not available when cross-compiling
 endif
@@ -52,7 +52,7 @@ build-docker: test-docker
 
 .PHONY: interactive-docker
 interactive-docker: test-docker
-	docker run -v $(PWD):/go/src/github.com/lyft/cni-ipvlan-vpc-k8s -it $(DOCKER_IMAGE) /bin/bash
+	docker run --privileged -v $(PWD):/go/src/github.com/lyft/cni-ipvlan-vpc-k8s -it $(DOCKER_IMAGE) /bin/bash
 
 .PHONY: ci
 ci:
