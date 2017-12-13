@@ -7,6 +7,6 @@ go:
   - 1.9
   
 script:
-  - make ci
+  - sudo make ci
 
   
