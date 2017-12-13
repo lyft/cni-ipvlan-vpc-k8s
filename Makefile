@@ -28,7 +28,7 @@ lint:
 .PHONY: test
 test: dep cache lint
 ifndef GOOS
-	go test -v ./aws
+	go test -v ./aws ./cmd/cni-ipvlan-vpc-k8s-tool
 else
 	@echo Tests not available when cross-compiling
 endif

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/urfave/cli"
@@ -15,15 +16,45 @@ import (
 
 var version string
 
+// Build a filter from input
+func filterBuild(input string) (map[string]string, error) {
+	if input == "" {
+		return nil, nil
+	}
+
+	ret := make(map[string]string, 0)
+	tuples := strings.Split(input, ",")
+	for _, t := range tuples {
+		kv := strings.Split(t, "=")
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("Invalid filter specified %v", t)
+		}
+		if len(kv[0]) <= 0 || len(kv[1]) <= 0 {
+			return nil, fmt.Errorf("Zero length filter specified: %v", t)
+		}
+
+		ret[kv[0]] = kv[1]
+	}
+
+	return ret, nil
+}
+
 func actionNewInterface(c *cli.Context) error {
 	return cniipvlanvpck8s.LockfileRun(func() error {
+		filtersRaw := c.String("subnet_filter")
+		filters, err := filterBuild(filtersRaw)
+		if err != nil {
+			fmt.Printf("Invalid filter specification %v", err)
+			return err
+		}
+
 		secGrps := c.Args()
 
 		if len(secGrps) <= 0 {
 			fmt.Println("please specify security groups")
 			return fmt.Errorf("need security groups")
 		}
-		newIf, err := aws.NewInterface(secGrps, nil)
+		newIf, err := aws.NewInterface(secGrps, filters)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -203,7 +234,7 @@ func main() {
 			Name:      "new-interface",
 			Usage:     "Create a new interface",
 			Action:    actionNewInterface,
-			ArgsUsage: "[security_group_ids...]",
+			ArgsUsage: "[--subnet_filter=k,v] [security_group_ids...]",
 		},
 		{
 			Name:      "remove-interface",
