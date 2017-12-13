@@ -8,6 +8,6 @@ go:
   
 script:
   - which go
-  - sudo -E make ci
+  - sudo env PATH=$PATH make ci
 
   
