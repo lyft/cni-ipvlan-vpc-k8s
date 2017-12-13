@@ -237,7 +237,7 @@ func main() {
 			ArgsUsage: "[--subnet_filter=k,v] [security_group_ids...]",
 			Flags: []cli.Flag{
 				cli.StringFlag{
-					Name: "subnet_filter",
+					Name:  "subnet_filter",
 					Usage: "Comma separated key=value filters to restrict subnets",
 				},
 			},
