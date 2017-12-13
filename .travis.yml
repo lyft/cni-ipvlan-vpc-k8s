@@ -7,6 +7,7 @@ go:
   - 1.9
   
 script:
-  - make ci
+  - which go
+  - sudo env PATH=$PATH make ci
 
   
