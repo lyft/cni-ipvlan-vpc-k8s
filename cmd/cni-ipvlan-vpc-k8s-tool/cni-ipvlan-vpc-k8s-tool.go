@@ -235,6 +235,12 @@ func main() {
 			Usage:     "Create a new interface",
 			Action:    actionNewInterface,
 			ArgsUsage: "[--subnet_filter=k,v] [security_group_ids...]",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name: "subnet_filter",
+					Usage: "Comma separated key=value filters to restrict subnets",
+				},
+			},
 		},
 		{
 			Name:      "remove-interface",
