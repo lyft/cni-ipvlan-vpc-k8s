@@ -1,12 +1,18 @@
 package nl
 
 import (
+	"os"
 	"testing"
 
 	"github.com/vishvananda/netlink"
 )
 
 func TestDownInterface(t *testing.T) {
+	if os.Getuid() != 0 {
+		t.Skip("Test requires root or network capabilities - skipped")
+		return
+	}
+
 	CreateTestInterface("lyft3")
 	defer RemoveInterface("lyft3")
 
@@ -20,6 +26,11 @@ func TestDownInterface(t *testing.T) {
 }
 
 func TestRemoveInterface(t *testing.T) {
+	if os.Getuid() != 0 {
+		t.Skip("Test requires root or network capabilities - skipped")
+		return
+	}
+
 	CreateTestInterface("lyft4")
 
 	if err := RemoveInterface("lyft4"); err != nil {
