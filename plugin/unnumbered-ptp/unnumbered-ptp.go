@@ -20,9 +20,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+	"math/rand"
 	"net"
 	"os"
 	"runtime"
+	"sort"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -31,6 +35,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/utils"
+	"github.com/coreos/go-iptables/iptables"
 	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 )
@@ -62,6 +67,7 @@ type PluginConf struct {
 	HostInterface      string `json:"hostInterface"`
 	ContainerInterface string `json:"containerInterface"`
 	MTU                int    `json:"mtu"`
+	TableStart         int    `json:"routeTableStart"`
 }
 
 // parseConfig parses the supplied configuration (and prevResult) from stdin.
@@ -98,10 +104,63 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 		return nil, fmt.Errorf("containerInterface must be specified")
 	}
 
+	// start using tables by default at 256
+	if conf.TableStart == 0 {
+		conf.TableStart = 256
+	}
+
 	return &conf, nil
 }
 
-func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netlink.Addr, pr *current.Result) (*current.Interface, *current.Interface, error) {
+func enableForwarding(ipv4 bool, ipv6 bool) error {
+	if ipv4 {
+		err := ip.EnableIP4Forward()
+		if err != nil {
+			return fmt.Errorf("Could not enable IPv6 forwarding: %v", err)
+		}
+	}
+	if ipv6 {
+		err := ip.EnableIP6Forward()
+		if err != nil {
+			return fmt.Errorf("Could not enable IPv6 forwarding: %v", err)
+		}
+	}
+	return nil
+}
+
+func setupSNAT(ifName string, comment string) error {
+	ipt, err := iptables.NewWithProtocol(iptables.ProtocolIPv4)
+	if err != nil {
+		return fmt.Errorf("failed to locate iptables: %v", err)
+	}
+	if err := ipt.AppendUnique("nat", "POSTROUTING", "-o", ifName, "-j", "MASQUERADE", "-m", "comment", "--comment", comment); err != nil {
+		return err
+	}
+	return nil
+}
+
+func findFreeTable(start int) (int, error) {
+	m := make(map[int]bool)
+	// combine V4 and V6 tables
+	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
+		rules, err := netlink.RuleList(family)
+		if err != nil {
+			return -1, err
+		}
+		for _, rule := range rules {
+			m[rule.Table] = true
+		}
+	}
+	// find first slot that's available for both V4 and V6 usage
+	for i := start; i < math.MaxUint32; i++ {
+		if m[i] == false {
+			return i, nil
+		}
+	}
+	return -1, fmt.Errorf("failed to find free route table")
+}
+
+func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netlink.Addr, masq, containerIPV4, containerIPV6 bool, k8sIfName string, pr *current.Result) (*current.Interface, *current.Interface, error) {
 	hostInterface := &current.Interface{}
 	containerInterface := &current.Interface{}
 
@@ -126,6 +185,19 @@ func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netl
 		contVeth, err := net.InterfaceByName(ifName)
 		if err != nil {
 			return fmt.Errorf("failed to look up %q: %v", ifName, err)
+		}
+
+		if masq {
+			// enable forwarding and SNATing for traffic rerouted from kube-proxy
+			err := enableForwarding(containerIPV4, containerIPV6)
+			if err != nil {
+				return err
+			}
+
+			err = setupSNAT(k8sIfName, "kube-proxy SNAT")
+			if err != nil {
+				return fmt.Errorf("failed to enable SNAT on %q: %v", k8sIfName, err)
+			}
 		}
 
 		// add host routes for each dst hostInterface ip on dev contVeth
@@ -175,7 +247,7 @@ func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netl
 	return hostInterface, containerInterface, nil
 }
 
-func setupHostVeth(vethName string, hostAddrs []netlink.Addr, result *current.Result) error {
+func setupHostVeth(vethName string, hostAddrs []netlink.Addr, masq bool, tableStart int, result *current.Result) error {
 	// hostVeth moved namespaces and may have a new ifindex
 	//	veth, err := netlink.LinkByName(vethName)
 	veth, err := net.InterfaceByName(vethName)
@@ -183,7 +255,7 @@ func setupHostVeth(vethName string, hostAddrs []netlink.Addr, result *current.Re
 		return fmt.Errorf("failed to lookup %q: %v", vethName, err)
 	}
 
-	for _, ipc := range result.IPs {
+	for i, ipc := range result.IPs {
 		addrBits := 128
 		if ipc.Address.IP.To4() != nil {
 			addrBits = 32
@@ -200,6 +272,62 @@ func setupHostVeth(vethName string, hostAddrs []netlink.Addr, result *current.Re
 
 		if err != nil {
 			return fmt.Errorf("failed to add host route dst %v: %v", ipc.Address.IP, err)
+		}
+
+		table := -1
+		// only one route is needed for each VPC route
+		if i == 0 {
+			// depend on netlink atomicity to win races for table slots on initial route add
+			sort.Slice(result.Routes, func(i, j int) bool {
+				return result.Routes[i].Dst.String() < result.Routes[j].Dst.String()
+			})
+
+			// try 10 times to find a table slot
+			for j := 0; j < 10 && table == -1; j++ {
+				// jitter looking for an initial free table slot
+				table, err = findFreeTable(tableStart + rand.Intn(500))
+				if err != nil {
+					return fmt.Errorf("error listing ip rules %v", err)
+				}
+
+				for k, route := range result.Routes {
+					err := netlink.RouteAdd(&netlink.Route{
+						LinkIndex: veth.Index,
+						Dst:       &route.Dst,
+						Gw:        ipc.Address.IP,
+						Table:     table,
+					})
+					if err != nil {
+						if k == 0 {
+							// failed to create initial route so sleep and try again
+							table = -1
+							wait := time.Duration(rand.Intn(int(math.Min(10000, 20*math.Pow(2, float64(j)))))) * time.Millisecond
+							fmt.Fprintf(os.Stderr, "route table collision, retrying in %v\n", wait)
+							time.Sleep(wait)
+							break
+						} else {
+							return fmt.Errorf("failed to add host route table %v: %v", ipc, err)
+
+						}
+					}
+				}
+			}
+			// ensure we have a route table selected
+			if table == -1 {
+				return fmt.Errorf("unable to find free route table")
+			}
+		}
+
+		// add source route for traffic originating from a Pod
+		rule := netlink.NewRule()
+		rule.Src = &net.IPNet{
+			IP:   ipc.Address.IP,
+			Mask: net.CIDRMask(addrBits, addrBits),
+		}
+		rule.Table = table
+		err = netlink.RuleAdd(rule)
+		if err != nil {
+			return fmt.Errorf("failed to add host rule src %v: %v", rule, err)
 		}
 	}
 
@@ -267,37 +395,30 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	hostInterface, _, err := setupContainerVeth(netns, conf.ContainerInterface, conf.MTU, hostAddrs, conf.PrevResult)
+	containerIPV4 := false
+	containerIPV6 := false
+	for _, ipc := range containerIPs {
+		if ipc.To4() != nil {
+			containerIPV4 = true
+		} else {
+			containerIPV6 = true
+		}
+	}
+
+	hostInterface, _, err := setupContainerVeth(netns, conf.ContainerInterface, conf.MTU,
+		hostAddrs, conf.IPMasq, containerIPV4, containerIPV6, args.IfName, conf.PrevResult)
 	if err != nil {
 		return err
 	}
 
-	if err = setupHostVeth(hostInterface.Name, hostAddrs, conf.PrevResult); err != nil {
+	if err = setupHostVeth(hostInterface.Name, hostAddrs, conf.IPMasq, conf.TableStart, conf.PrevResult); err != nil {
 		return err
 	}
 
 	if conf.IPMasq {
-		ipv4 := false
-		ipv6 := false
-		// only enable forwarding if masq is enabled
-		for _, ipc := range containerIPs {
-			if ipc.To4() != nil {
-				ipv4 = true
-			} else {
-				ipv6 = true
-			}
-		}
-		if ipv4 {
-			err := ip.EnableIP4Forward()
-			if err != nil {
-				return fmt.Errorf("Could not enable IPv6 forwarding: %v", err)
-			}
-		}
-		if ipv6 {
-			err := ip.EnableIP6Forward()
-			if err != nil {
-				return fmt.Errorf("Could not enable IPv6 forwarding: %v", err)
-			}
+		err := enableForwarding(containerIPV4, containerIPV6)
+		if err != nil {
+			return err
 		}
 
 		chain := utils.FormatChainName(conf.Name, args.ContainerID)
@@ -362,7 +483,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	})
 
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "ptp container interface teardown error: %v", err)
+		fmt.Fprintf(os.Stderr, "ptp container interface teardown error: %v\n", err)
 	}
 
 	if conf.IPMasq {
@@ -375,6 +496,13 @@ func cmdDel(args *skel.CmdArgs) error {
 			}
 
 			err = ip.TeardownIPMasq(&net.IPNet{IP: ipn.IP, Mask: net.CIDRMask(addrBits, addrBits)}, chain, comment)
+
+			rule := netlink.NewRule()
+			rule.Src = &net.IPNet{
+				IP:   ipn.IP,
+				Mask: net.CIDRMask(addrBits, addrBits),
+			}
+			err = netlink.RuleDel(rule)
 		}
 	}
 
@@ -382,5 +510,6 @@ func cmdDel(args *skel.CmdArgs) error {
 }
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	skel.PluginMain(cmdAdd, cmdDel, version.All)
 }
