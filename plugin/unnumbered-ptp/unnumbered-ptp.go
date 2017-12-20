@@ -316,18 +316,14 @@ func setupHostVeth(vethName string, hostAddrs []netlink.Addr, masq bool, tableSt
 			if table == -1 {
 				return fmt.Errorf("unable to find free route table")
 			}
-		}
-
-		// add source route for traffic originating from a Pod
-		rule := netlink.NewRule()
-		rule.Src = &net.IPNet{
-			IP:   ipc.Address.IP,
-			Mask: net.CIDRMask(addrBits, addrBits),
-		}
-		rule.Table = table
-		err = netlink.RuleAdd(rule)
-		if err != nil {
-			return fmt.Errorf("failed to add host rule src %v: %v", rule, err)
+			// add source route for traffic originating from a Pod
+			rule := netlink.NewRule()
+			rule.IifName = vethName
+			rule.Table = table
+			err = netlink.RuleAdd(rule)
+			if err != nil {
+				return fmt.Errorf("failed to add host rule src %v: %v", rule, err)
+			}
 		}
 	}
 
@@ -454,6 +450,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	// so don't return an error if the device is already removed.
 	// If the device isn't there then don't try to clean up IP masq either.
 	var ipnets []netlink.Addr
+	vethPeerIndex := -1
 	err = ns.WithNetNSPath(args.Netns, func(_ ns.NetNS) error {
 		var err error
 
@@ -473,12 +470,11 @@ func cmdDel(args *skel.CmdArgs) error {
 			}
 		}
 
-		// rm the veth device
-		err = ip.DelLinkByName(conf.ContainerInterface)
+		vethIface, err := netlink.LinkByName(conf.ContainerInterface)
 		if err != nil && err != ip.ErrLinkNotFound {
 			return err
 		}
-
+		vethPeerIndex, err = netlink.VethPeerIndex(&netlink.Veth{LinkAttrs: *vethIface.Attrs()})
 		return nil
 	})
 
@@ -496,13 +492,18 @@ func cmdDel(args *skel.CmdArgs) error {
 			}
 
 			err = ip.TeardownIPMasq(&net.IPNet{IP: ipn.IP, Mask: net.CIDRMask(addrBits, addrBits)}, chain, comment)
+		}
+
+		if vethPeerIndex != -1 {
+			link, err := netlink.LinkByIndex(vethPeerIndex)
+			if err != nil {
+				return nil
+			}
 
 			rule := netlink.NewRule()
-			rule.Src = &net.IPNet{
-				IP:   ipn.IP,
-				Mask: net.CIDRMask(addrBits, addrBits),
-			}
+			rule.IifName = link.Attrs().Name
 			err = netlink.RuleDel(rule)
+			err = netlink.LinkDel(link)
 		}
 	}
 
