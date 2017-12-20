@@ -40,6 +40,10 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+// constants for full jitter backoff in milliseconds
+const minSleep = 10000 // 10.00s
+const baseSleep = 20   //  0.02s
+
 func init() {
 	// this ensures that main runs only on main thread (thread group leader).
 	// since namespace ops (unshare, setns) are done for a single thread, we
@@ -301,7 +305,8 @@ func setupHostVeth(vethName string, hostAddrs []netlink.Addr, masq bool, tableSt
 						if k == 0 {
 							// failed to create initial route so sleep and try again
 							table = -1
-							wait := time.Duration(rand.Intn(int(math.Min(10000, 20*math.Pow(2, float64(j)))))) * time.Millisecond
+							wait := time.Duration(rand.Intn(int(math.Min(minSleep,
+								baseSleep*math.Pow(2, float64(j)))))) * time.Millisecond
 							fmt.Fprintf(os.Stderr, "route table collision, retrying in %v\n", wait)
 							time.Sleep(wait)
 							break
