@@ -144,7 +144,7 @@ func setupSNAT(ifName string, comment string) error {
 }
 
 func findFreeTable(start int) (int, error) {
-	m := make(map[int]bool)
+	allocatedTableIDs := make(map[int]bool)
 	// combine V4 and V6 tables
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
 		rules, err := netlink.RuleList(family)
@@ -152,12 +152,12 @@ func findFreeTable(start int) (int, error) {
 			return -1, err
 		}
 		for _, rule := range rules {
-			m[rule.Table] = true
+			allocatedTableIDs[rule.Table] = true
 		}
 	}
 	// find first slot that's available for both V4 and V6 usage
 	for i := start; i < math.MaxUint32; i++ {
-		if m[i] == false {
+		if allocatedTableIDs[i] == false {
 			return i, nil
 		}
 	}
