@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
-	"github.com/vishvananda/netns"
 )
 
 // BoundIP contains an IPNet / Label pair
@@ -47,17 +47,10 @@ func getIpsOnHandle(handle *netlink.Handle) ([]BoundIP, error) {
 // TODO: Remove addresses on control plane interfaces, filters
 func GetIPs() ([]BoundIP, error) {
 
-	originNs, err := netns.Get()
-	if err != nil {
-		return nil, err
-	}
-	defer originNs.Close()
-
 	var namespaces []string
 
 	files, err := ioutil.ReadDir("/var/run/netns/")
 	if err != nil {
-		_, err = fmt.Fprintln(os.Stderr, "Couldn't enumerate named namespaces")
 		if err != nil {
 			// Ignore this error
 		}
@@ -76,7 +69,7 @@ func GetIPs() ([]BoundIP, error) {
 		namespaces = append(namespaces, dockerNamespaces...)
 	}
 
-	// First get all the IPs on the first handle
+	// First get all the IPs in the main namespace
 	handle, err := netlink.NewHandle()
 	if err != nil {
 		return nil, err
@@ -87,26 +80,21 @@ func GetIPs() ([]BoundIP, error) {
 	}
 
 	// Enter each namesapce, get handles
-	for _, f := range namespaces {
-		nsHandle, err := netns.GetFromPath(f)
-		if err != nil {
-			return nil, err
-		}
-		handle, err = netlink.NewHandleAt(nsHandle)
-		if err != nil {
-			return nil, err
-		}
+	for _, nsPath := range namespaces {
+		err := ns.WithNetNSPath(nsPath, func(_ ns.NetNS) error {
 
-		newIps, err := getIpsOnHandle(handle)
-		if err != nil {
-			return nil, err
-		}
-		foundIps = append(foundIps, newIps...)
+			handle, err = netlink.NewHandle()
+			if err != nil {
+				return err
+			}
+			defer handle.Delete()
 
-		handle.Delete()
-		err = nsHandle.Close()
+			newIps, err := getIpsOnHandle(handle)
+			foundIps = append(foundIps, newIps...)
+			return err
+		})
 		if err != nil {
-			panic(err)
+			fmt.Fprintf(os.Stderr, "Enumerating namespace failure %v", err)
 		}
 	}
 
