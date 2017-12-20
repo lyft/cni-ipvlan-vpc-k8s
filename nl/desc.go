@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
@@ -64,7 +65,7 @@ func GetIPs() ([]BoundIP, error) {
 	} else {
 		for _, file := range files {
 			namespaces = append(namespaces,
-				fmt.Sprintf("/var/run/netns/%s", file.Name()))
+				filepath.Join("/var/run/netns", file.Name()))
 		}
 	}
 
@@ -85,7 +86,7 @@ func GetIPs() ([]BoundIP, error) {
 		return nil, err
 	}
 
-	// Enter each _named_ namesapce, get handles
+	// Enter each namesapce, get handles
 	for _, f := range namespaces {
 		nsHandle, err := netns.GetFromPath(f)
 		if err != nil {
