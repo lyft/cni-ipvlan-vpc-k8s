@@ -41,7 +41,7 @@ import (
 )
 
 // constants for full jitter backoff in milliseconds
-const minSleep = 10000 // 10.00s
+const maxSleep = 10000 // 10.00s
 const baseSleep = 20   //  0.02s
 
 func init() {
@@ -164,6 +164,63 @@ func findFreeTable(start int) (int, error) {
 	return -1, fmt.Errorf("failed to find free route table")
 }
 
+func addPolicyRules(veth *net.Interface, ipc *current.IPConfig, routes []*types.Route, tableStart int) error {
+	table := -1
+
+	// depend on netlink atomicity to win races for table slots on initial route add
+	sort.Slice(routes, func(i, j int) bool {
+		return routes[i].Dst.String() < routes[j].Dst.String()
+	})
+
+	// try 10 times to write to an empty table slot
+	for i := 0; i < 10 && table == -1; i++ {
+		var err error
+		// jitter looking for an initial free table slot
+		table, err = findFreeTable(tableStart + rand.Intn(1000))
+		if err != nil {
+			return err
+		}
+
+		// add routes to the policy routing table
+		for _, route := range routes {
+			err := netlink.RouteAdd(&netlink.Route{
+				LinkIndex: veth.Index,
+				Dst:       &route.Dst,
+				Gw:        ipc.Address.IP,
+				Table:     table,
+			})
+			if err != nil {
+				table = -1
+				break
+			}
+		}
+
+		if table == -1 {
+			// failed to add routes so sleep and try again on a different table
+			wait := time.Duration(rand.Intn(int(math.Min(maxSleep,
+				baseSleep*math.Pow(2, float64(i)))))) * time.Millisecond
+			fmt.Fprintf(os.Stderr, "route table collision, retrying in %v\n", wait)
+			time.Sleep(wait)
+		}
+	}
+
+	// ensure we have a route table selected
+	if table == -1 {
+		return fmt.Errorf("failed to add routes to a free table")
+	}
+
+	// add policy route for traffic originating from a Pod
+	rule := netlink.NewRule()
+	rule.IifName = veth.Name
+	rule.Table = table
+	err := netlink.RuleAdd(rule)
+	if err != nil {
+		return fmt.Errorf("failed to add policy rule %v: %v", rule, err)
+	}
+
+	return nil
+}
+
 func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netlink.Addr, masq, containerIPV4, containerIPV6 bool, k8sIfName string, pr *current.Result) (*current.Interface, *current.Interface, error) {
 	hostInterface := &current.Interface{}
 	containerInterface := &current.Interface{}
@@ -252,14 +309,19 @@ func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netl
 }
 
 func setupHostVeth(vethName string, hostAddrs []netlink.Addr, masq bool, tableStart int, result *current.Result) error {
-	// hostVeth moved namespaces and may have a new ifindex
-	//	veth, err := netlink.LinkByName(vethName)
+	// no IPs to route
+	if len(result.IPs) == 0 {
+		return nil
+	}
+
+	// lookup by name as interface ids might have changed
 	veth, err := net.InterfaceByName(vethName)
 	if err != nil {
 		return fmt.Errorf("failed to lookup %q: %v", vethName, err)
 	}
 
-	for i, ipc := range result.IPs {
+	// add destination routes to Pod IPs
+	for _, ipc := range result.IPs {
 		addrBits := 128
 		if ipc.Address.IP.To4() != nil {
 			addrBits = 32
@@ -277,59 +339,12 @@ func setupHostVeth(vethName string, hostAddrs []netlink.Addr, masq bool, tableSt
 		if err != nil {
 			return fmt.Errorf("failed to add host route dst %v: %v", ipc.Address.IP, err)
 		}
+	}
 
-		table := -1
-		// only one route is needed for each VPC route
-		if i == 0 {
-			// depend on netlink atomicity to win races for table slots on initial route add
-			sort.Slice(result.Routes, func(i, j int) bool {
-				return result.Routes[i].Dst.String() < result.Routes[j].Dst.String()
-			})
-
-			// try 10 times to find a table slot
-			for j := 0; j < 10 && table == -1; j++ {
-				// jitter looking for an initial free table slot
-				table, err = findFreeTable(tableStart + rand.Intn(1000))
-				if err != nil {
-					return fmt.Errorf("error listing ip rules %v", err)
-				}
-
-				for k, route := range result.Routes {
-					err := netlink.RouteAdd(&netlink.Route{
-						LinkIndex: veth.Index,
-						Dst:       &route.Dst,
-						Gw:        ipc.Address.IP,
-						Table:     table,
-					})
-					if err != nil {
-						if k == 0 {
-							// failed to create initial route so sleep and try again
-							table = -1
-							wait := time.Duration(rand.Intn(int(math.Min(minSleep,
-								baseSleep*math.Pow(2, float64(j)))))) * time.Millisecond
-							fmt.Fprintf(os.Stderr, "route table collision, retrying in %v\n", wait)
-							time.Sleep(wait)
-							break
-						} else {
-							return fmt.Errorf("failed to add host route table %v: %v", ipc, err)
-
-						}
-					}
-				}
-			}
-			// ensure we have a route table selected
-			if table == -1 {
-				return fmt.Errorf("unable to find free route table")
-			}
-			// add policy route for traffic originating from a Pod
-			rule := netlink.NewRule()
-			rule.IifName = vethName
-			rule.Table = table
-			err = netlink.RuleAdd(rule)
-			if err != nil {
-				return fmt.Errorf("failed to add policy rule %v: %v", rule, err)
-			}
-		}
+	// add policy rules for traffic coming in from Pods and destined for the VPC
+	err = addPolicyRules(veth, result.IPs[0], result.Routes, tableStart)
+	if err != nil {
+		return fmt.Errorf("failed to add policy rules: %v", err)
 	}
 
 	// Send a gratuitous arp for all borrowed v4 addresses
@@ -483,10 +498,6 @@ func cmdDel(args *skel.CmdArgs) error {
 		return nil
 	})
 
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ptp container interface teardown error: %v\n", err)
-	}
-
 	if conf.IPMasq {
 		chain := utils.FormatChainName(conf.Name, args.ContainerID)
 		comment := utils.FormatComment(conf.Name, args.ContainerID)
@@ -507,8 +518,9 @@ func cmdDel(args *skel.CmdArgs) error {
 
 			rule := netlink.NewRule()
 			rule.IifName = link.Attrs().Name
-			err = netlink.RuleDel(rule)
-			err = netlink.LinkDel(link)
+			// ignore errors as we might be called multiple times
+			_ = netlink.RuleDel(rule)
+			_ = netlink.LinkDel(link)
 		}
 	}
 
