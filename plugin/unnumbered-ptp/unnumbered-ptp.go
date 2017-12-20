@@ -316,13 +316,13 @@ func setupHostVeth(vethName string, hostAddrs []netlink.Addr, masq bool, tableSt
 			if table == -1 {
 				return fmt.Errorf("unable to find free route table")
 			}
-			// add source route for traffic originating from a Pod
+			// add policy route for traffic originating from a Pod
 			rule := netlink.NewRule()
 			rule.IifName = vethName
 			rule.Table = table
 			err = netlink.RuleAdd(rule)
 			if err != nil {
-				return fmt.Errorf("failed to add host rule src %v: %v", rule, err)
+				return fmt.Errorf("failed to add policy rule %v: %v", rule, err)
 			}
 		}
 	}
