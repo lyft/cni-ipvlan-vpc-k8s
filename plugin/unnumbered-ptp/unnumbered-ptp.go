@@ -289,7 +289,7 @@ func setupHostVeth(vethName string, hostAddrs []netlink.Addr, masq bool, tableSt
 			// try 10 times to find a table slot
 			for j := 0; j < 10 && table == -1; j++ {
 				// jitter looking for an initial free table slot
-				table, err = findFreeTable(tableStart + rand.Intn(500))
+				table, err = findFreeTable(tableStart + rand.Intn(1000))
 				if err != nil {
 					return fmt.Errorf("error listing ip rules %v", err)
 				}
