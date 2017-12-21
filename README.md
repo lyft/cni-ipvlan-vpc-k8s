@@ -95,12 +95,10 @@ devices. Source and destination IPs are the well-known Kubernetes
 addresses on either side of the connect.
 
 * kube-proxy: We use kube-proxy in iptables mode and it functions as
-  expected, but with the caveat that Kubernetes Services see
-  connections from a node’s source IP instead of the Pod’s source IP
-  as the netfilter rules are processed in the default namespace. This
-  side effect is similar to Kubernetes behavior under the userspace
-  proxy. Since we’re optimizing for services connecting via the Envoy
-  mesh, this particular tradeoff hasn’t been a significant issue.
+  expected. The Pod's source IP is retained -- Kubernetes Services see
+  connections from the Pod's source IP. The unnumbered point-to-point
+  interface is used to loop traffic between kube-proxy in the default
+  namespace for outbound connections created in the Pod namespace.
 * [kube2iam](https://github.com/jtblin/kube2iam): Traffic from Pods to
   the AWS Metadata service transits over the unnumbered point-to-point
   interface to reach the default namespace before being redirected via
