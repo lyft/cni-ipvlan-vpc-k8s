@@ -95,14 +95,17 @@ func cmdAdd(args *skel.CmdArgs) error {
 		if err != nil {
 			// failed, so attempt to add an IP to a new interface
 			newIf, err := aws.NewInterface(conf.IPAM.SecGroupIds, conf.IPAM.SubnetTags)
-			if err != nil {
+			// If this interface has somehow gained more than one IP since being allocated,
+			// abort this process and let a subsequent run find a valid IP.
+			if err != nil || len(newIf.IPv4s) != 1 {
 				return fmt.Errorf("unable to create a new elastic network interface due to %v",
 					err)
 			}
-			alloc, err = aws.AllocateIPOn(*newIf)
-			if err != nil {
-				return fmt.Errorf("unable to allocate an IP due to %v",
-					err)
+			// Freshly allocated interfaces will always have one valid IP - use
+			// this IP address.
+			alloc = &aws.AllocationResult{
+				&newIf.IPv4s[0],
+				*newIf,
 			}
 		}
 	}
