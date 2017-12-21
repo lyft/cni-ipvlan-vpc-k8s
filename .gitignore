@@ -4,7 +4,7 @@
 vendor/
 vendor.orig/
 
-cni-ipvlan-vpc-k8s-*
+/cni-ipvlan-vpc-k8s-*
 *.tar.gz
 
 # Test binary, build with `go test -c`
