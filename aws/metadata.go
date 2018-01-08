@@ -36,6 +36,12 @@ func (a Interfaces) Len() int           { return len(a) }
 func (a Interfaces) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a Interfaces) Less(i, j int) bool { return a[i].Number < a[j].Number }
 
+// MetadataClient provides methods to query the metadata service
+type MetadataClient interface {
+	Available() bool
+	GetInterfaces() ([]Interface, error)
+}
+
 // EC2 generally gives the following data blocks from an interface in meta-data
 // device-number
 // interface-id
@@ -52,13 +58,13 @@ func (a Interfaces) Less(i, j int) bool { return a[i].Number < a[j].Number }
 // vpc-ipv4-cidr-blocks
 // vpc-ipv6-cidr-blocks
 
-func getInterface(mac string) (Interface, error) {
+func (c *awsclient) getInterface(mac string) (Interface, error) {
 	var iface Interface
 	iface.Mac = mac
 
 	prefix := fmt.Sprintf("network/interfaces/macs/%s/", mac)
 	get := func(val string) (data string, err error) {
-		return metaData.GetMetadata(fmt.Sprintf("%s/%s", prefix, val))
+		return c.metaData.GetMetadata(fmt.Sprintf("%s/%s", prefix, val))
 	}
 	metadataParser := func(metadataId string, modifer func(*Interface, string) error) error {
 		metadata, _ := get(metadataId)
@@ -153,19 +159,19 @@ func getInterface(mac string) (Interface, error) {
 }
 
 // Available returns the availability status
-func Available() bool {
-	return metaData.Available()
+func (c *awsclient) Available() bool {
+	return c.metaData.Available()
 }
 
 // GetInterfaces returns a list of configured interfaces
-func GetInterfaces() ([]Interface, error) {
+func (c *awsclient) GetInterfaces() ([]Interface, error) {
 	var interfaces []Interface
 
-	if !metaData.Available() {
+	if !c.metaData.Available() {
 		return nil, fmt.Errorf("EC2 Metadata not available")
 	}
 
-	macResult, err := metaData.GetMetadata("network/interfaces/macs/")
+	macResult, err := c.metaData.GetMetadata("network/interfaces/macs/")
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +182,7 @@ func GetInterfaces() ([]Interface, error) {
 			continue
 		}
 		mac = mac[0 : len(mac)-1]
-		iface, err := getInterface(mac)
+		iface, err := c.getInterface(mac)
 		if err != nil {
 			return nil, err
 		}

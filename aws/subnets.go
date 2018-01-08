@@ -2,6 +2,8 @@ package aws
 
 import (
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/lyft/cni-ipvlan-vpc-k8s/aws/cache"
+	"time"
 )
 
 // Subnet contains attributes of a subnet
@@ -23,17 +25,41 @@ func (a SubnetsByAvailableAddressCount) Less(i, j int) bool {
 	return a[i].AvailableAddressCount > a[j].AvailableAddressCount
 }
 
+// SubnetsClient provides information about VPC subnets
+type SubnetsClient interface {
+	GetSubnetsForInstance() ([]Subnet, error)
+}
+
+type subnetsCacheClient struct {
+	subnets    *subnetsClient
+	expiration time.Duration
+}
+
+func (s *subnetsCacheClient) GetSubnetsForInstance() (subnets []Subnet, err error) {
+	state := cache.Get("subnets_for_instance", &subnets)
+	if state == cache.CacheFound {
+		return
+	}
+	subnets, err = s.subnets.GetSubnetsForInstance()
+	cache.Store("subnets_for_instance", s.expiration, &subnets)
+	return
+}
+
+type subnetsClient struct {
+	aws *awsclient
+}
+
 // GetSubnetsForInstance returns a list of subnets for the running instance
-func GetSubnetsForInstance() ([]Subnet, error) {
+func (c *subnetsClient) GetSubnetsForInstance() ([]Subnet, error) {
 	var subnets []Subnet
 
-	id, err := getIDDoc()
+	id, err := c.aws.getIDDoc()
 	if err != nil {
 		return nil, err
 	}
 	az := id.AvailabilityZone
 
-	ec2Client, err := newEC2()
+	ec2Client, err := c.aws.newEC2()
 	if err != nil {
 		return nil, err
 	}

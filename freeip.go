@@ -13,7 +13,7 @@ import (
 func FindFreeIPsAtIndex(index int) ([]*aws.AllocationResult, error) {
 	freeIps := []*aws.AllocationResult{}
 
-	interfaces, err := aws.GetInterfaces()
+	interfaces, err := aws.DefaultClient.GetInterfaces()
 	if err != nil {
 		return nil, err
 	}

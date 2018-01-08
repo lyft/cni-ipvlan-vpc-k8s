@@ -78,10 +78,10 @@ func TestRemoveInterface(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		_ec2Client = &ec2ClientMock{
+		defaultClient.ec2Client = &ec2ClientMock{
 			NetworkDescribeResponse: c.NetworkDescribeResponse,
 		}
-		err := RemoveInterface(c.Input)
+		err := defaultClient.RemoveInterface(c.Input)
 
 		if err != nil {
 			t.Fatalf("%d Mock returned an error: %v", i, err)
@@ -101,8 +101,8 @@ func TestDeleteInterface(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		_ec2Client = &ec2ClientMock{NetworkDeleteResponse: c.Response}
-		err := deleteInterface(c.Input)
+		defaultClient.ec2Client = &ec2ClientMock{NetworkDeleteResponse: c.Response}
+		err := defaultClient.deleteInterface(c.Input)
 
 		if err != nil {
 			t.Fatalf("%d Mock returned an error: %v", i, err)
@@ -144,8 +144,8 @@ func TestWaitUntilInterfaceDetaches(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		_ec2Client = &ec2ClientMock{NetworkDescribeResponse: c.Response}
-		err := waitUtilInterfaceDetaches(c.Input)
+		defaultClient.ec2Client = &ec2ClientMock{NetworkDescribeResponse: c.Response}
+		err := defaultClient.waitUtilInterfaceDetaches(c.Input)
 
 		if err != nil {
 			if err.Error() != c.Expected {
@@ -188,8 +188,8 @@ func TestDescribeNetworkInterface(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		_ec2Client = &ec2ClientMock{NetworkDescribeResponse: c.Response}
-		res, err := describeNetworkInterface(c.Input)
+		defaultClient.ec2Client = &ec2ClientMock{NetworkDescribeResponse: c.Response}
+		res, err := defaultClient.describeNetworkInterface(c.Input)
 
 		if err != nil {
 			if err.Error() != "Cannot describe interface, it might not exist" {

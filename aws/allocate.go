@@ -15,9 +15,22 @@ type AllocationResult struct {
 	Interface Interface
 }
 
+// AllocateClient offers IP allocation on interfaces
+type AllocateClient interface {
+	AllocateIPOn(intf Interface) (*AllocationResult, error)
+	AllocateIPFirstAvailableAtIndex(index int) (*AllocationResult, error)
+	AllocateIPFirstAvailable() (*AllocationResult, error)
+	DeallocateIP(ipToRelease *net.IP) error
+}
+
+type allocateClient struct {
+	aws    *awsclient
+	subnet SubnetsClient
+}
+
 // AllocateIPOn allocates an IP on a specific interface.
-func AllocateIPOn(intf Interface) (*AllocationResult, error) {
-	client, err := newEC2()
+func (c *allocateClient) AllocateIPOn(intf Interface) (*AllocationResult, error) {
+	client, err := c.aws.newEC2()
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +45,7 @@ func AllocateIPOn(intf Interface) (*AllocationResult, error) {
 	}
 
 	for attempts := 10; attempts > 0; attempts-- {
-		newIntf, err := getInterface(intf.Mac)
+		newIntf, err := c.aws.getInterface(intf.Mac)
 		if err != nil {
 			time.Sleep(1.0 * time.Second)
 			continue
@@ -64,12 +77,12 @@ func AllocateIPOn(intf Interface) (*AllocationResult, error) {
 
 // AllocateIPFirstAvailableAtIndex allocates an IP address, skipping any adapter < the given index
 // Returns a reference to the interface the IP was allocated on
-func AllocateIPFirstAvailableAtIndex(index int) (*AllocationResult, error) {
-	interfaces, err := GetInterfaces()
+func (c *allocateClient) AllocateIPFirstAvailableAtIndex(index int) (*AllocationResult, error) {
+	interfaces, err := c.aws.GetInterfaces()
 	if err != nil {
 		return nil, err
 	}
-	limits := ENILimits()
+	limits := c.aws.ENILimits()
 
 	var candidates []Interface
 	for _, intf := range interfaces {
@@ -81,7 +94,7 @@ func AllocateIPFirstAvailableAtIndex(index int) (*AllocationResult, error) {
 		}
 	}
 
-	subnets, err := GetSubnetsForInstance()
+	subnets, err := c.subnet.GetSubnetsForInstance()
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +106,7 @@ func AllocateIPFirstAvailableAtIndex(index int) (*AllocationResult, error) {
 		}
 		for _, intf := range candidates {
 			if intf.SubnetID == subnet.ID {
-				return AllocateIPOn(intf)
+				return c.AllocateIPOn(intf)
 			}
 		}
 	}
@@ -103,17 +116,17 @@ func AllocateIPFirstAvailableAtIndex(index int) (*AllocationResult, error) {
 
 // AllocateIPFirstAvailable allocates an IP address on the first available IP address
 // Returns a reference to the interface the IP was allocated on
-func AllocateIPFirstAvailable() (*AllocationResult, error) {
-	return AllocateIPFirstAvailableAtIndex(0)
+func (c *allocateClient) AllocateIPFirstAvailable() (*AllocationResult, error) {
+	return c.AllocateIPFirstAvailableAtIndex(0)
 }
 
 // DeallocateIP releases an IP back to AWS
-func DeallocateIP(ipToRelease *net.IP) error {
-	client, err := newEC2()
+func (c *allocateClient) DeallocateIP(ipToRelease *net.IP) error {
+	client, err := c.aws.newEC2()
 	if err != nil {
 		return err
 	}
-	interfaces, err := GetInterfaces()
+	interfaces, err := c.aws.GetInterfaces()
 	if err != nil {
 		return err
 	}
