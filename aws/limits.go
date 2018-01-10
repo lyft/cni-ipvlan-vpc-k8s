@@ -7,6 +7,11 @@ type ENILimit struct {
 	IPv6     int
 }
 
+// LimitsClient provides methods for locating limits in AWS
+type LimitsClient interface {
+	ENILimits() ENILimit
+}
+
 var eniLimits map[string]ENILimit
 
 func init() {
@@ -112,8 +117,8 @@ func ENILimitsForInstanceType(itype string) (limit ENILimit) {
 }
 
 // ENILimits returns the limits based on the system's instance type
-func ENILimits() ENILimit {
-	id, err := getIDDoc()
+func (c *awsclient) ENILimits() ENILimit {
+	id, err := c.getIDDoc()
 	if err != nil || id == nil {
 		return ENILimit{}
 	}

@@ -45,18 +45,18 @@ func TestGetSubnetsForInstance(t *testing.T) {
 		},
 	}
 
-	oldIDDoc := _idDoc
-	defer func() { _idDoc = oldIDDoc }()
+	oldIDDoc := defaultClient.idDoc
+	defer func() { defaultClient.idDoc = oldIDDoc }()
 
-	_idDoc = &ec2metadata.EC2InstanceIdentityDocument{
+	defaultClient.idDoc = &ec2metadata.EC2InstanceIdentityDocument{
 		Region:           "us-east-1",
 		AvailabilityZone: "us-east-1a",
 	}
 
 	for i, c := range cases {
-		_ec2Client = &ec2SubnetsMock{Resp: c.Resp}
+		defaultClient.ec2Client = &ec2SubnetsMock{Resp: c.Resp}
 
-		res, err := GetSubnetsForInstance()
+		res, err := defaultClient.GetSubnetsForInstance()
 		if err != nil {
 			t.Fatalf("%d Mock returned an error - is it mocked? %v", i, err)
 		}

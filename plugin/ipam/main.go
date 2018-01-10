@@ -91,10 +91,10 @@ func cmdAdd(args *skel.CmdArgs) error {
 		alloc = free[0]
 	} else {
 		// allocate an IP on an available interface
-		alloc, err = aws.AllocateIPFirstAvailableAtIndex(conf.IPAM.IfaceIndex)
+		alloc, err = aws.DefaultClient.AllocateIPFirstAvailableAtIndex(conf.IPAM.IfaceIndex)
 		if err != nil {
 			// failed, so attempt to add an IP to a new interface
-			newIf, err := aws.NewInterface(conf.IPAM.SecGroupIds, conf.IPAM.SubnetTags)
+			newIf, err := aws.DefaultClient.NewInterface(conf.IPAM.SecGroupIds, conf.IPAM.SubnetTags)
 			// If this interface has somehow gained more than one IP since being allocated,
 			// abort this process and let a subsequent run find a valid IP.
 			if err != nil || len(newIf.IPv4s) != 1 {
@@ -180,7 +180,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	if !conf.IPAM.SkipDeallocation {
 		// deallocate IPs outside of the namespace so creds are correct
 		for _, addr := range addrs {
-			aws.DeallocateIP(&addr.IP)
+			aws.DefaultClient.DeallocateIP(&addr.IP)
 		}
 	}
 	return nil

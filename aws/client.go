@@ -8,53 +8,90 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
+	"time"
 )
 
-var sess *session.Session
-var metaData *ec2metadata.EC2Metadata
+type awsclient struct {
+	sess     *session.Session
+	metaData *ec2metadata.EC2Metadata
 
-var _idDoc *ec2metadata.EC2InstanceIdentityDocument
-var _onceIDDoc sync.Once
+	idDoc     *ec2metadata.EC2InstanceIdentityDocument
+	onceIDDoc sync.Once
 
-var _ec2Client ec2iface.EC2API
-var _onceEc2 sync.Once
-
-func init() {
-	sess = session.Must(session.NewSession())
-	metaData = ec2metadata.New(sess)
+	ec2Client ec2iface.EC2API
+	onceEc2   sync.Once
 }
 
-func getIDDoc() (*ec2metadata.EC2InstanceIdentityDocument, error) {
+type combinedClient struct {
+	*subnetsClient
+	*awsclient
+	*interfaceClient
+	*allocateClient
+}
+
+// Client offers all of the supporting AWS services
+type Client interface {
+	InterfaceClient
+	LimitsClient
+	MetadataClient
+	SubnetsClient
+	AllocateClient
+}
+
+var defaultClient *combinedClient
+
+// DefaultClient that is setup with known defaults
+var DefaultClient Client
+
+func init() {
+	awsClient := &awsclient{}
+	subnets := &subnetsCacheClient{
+		&subnetsClient{aws: awsClient},
+		1 * time.Minute,
+	}
+	defaultClient = &combinedClient{
+		&subnetsClient{awsClient},
+		awsClient,
+		&interfaceClient{awsClient, subnets},
+		&allocateClient{awsClient, subnets},
+	}
+
+	DefaultClient = defaultClient
+	defaultClient.sess = session.Must(session.NewSession())
+	defaultClient.metaData = ec2metadata.New(defaultClient.sess)
+}
+
+func (c *awsclient) getIDDoc() (*ec2metadata.EC2InstanceIdentityDocument, error) {
 	var err error
-	_onceIDDoc.Do(func() {
+	c.onceIDDoc.Do(func() {
 		// Allow mock ID documents to be inserted
-		if _idDoc == nil {
+		if c.idDoc == nil {
 			var instance ec2metadata.EC2InstanceIdentityDocument
-			instance, err = metaData.GetInstanceIdentityDocument()
+			instance, err = c.metaData.GetInstanceIdentityDocument()
 			if err != nil {
 				return
 			}
 			// Cache the document
-			_idDoc = &instance
+			c.idDoc = &instance
 		}
 	})
-	return _idDoc, err
+	return c.idDoc, err
 }
 
 // Allocate a new EC2 client configured for the current instance
 // region. Clients are re-used across multiple calls
-func newEC2() (ec2iface.EC2API, error) {
+func (c *awsclient) newEC2() (ec2iface.EC2API, error) {
 	var err error
-	_onceEc2.Do(func() {
+	c.onceEc2.Do(func() {
 		var id *ec2metadata.EC2InstanceIdentityDocument
-		id, err = getIDDoc()
+		id, err = c.getIDDoc()
 		if err != nil {
 			return
 		}
-		if _ec2Client == nil {
+		if c.ec2Client == nil {
 			// Use the sess object already defined
-			_ec2Client = ec2.New(sess, aws.NewConfig().WithRegion(id.Region))
+			c.ec2Client = ec2.New(c.sess, aws.NewConfig().WithRegion(id.Region))
 		}
 	})
-	return _ec2Client, err
+	return c.ec2Client, err
 }

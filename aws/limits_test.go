@@ -7,16 +7,16 @@ import (
 )
 
 func TestLimitsReturn(t *testing.T) {
-	oldIDDoc := _idDoc
-	defer func() { _idDoc = oldIDDoc }()
+	oldIDDoc := defaultClient.idDoc
+	defer func() { defaultClient.idDoc = oldIDDoc }()
 
-	_idDoc = &ec2metadata.EC2InstanceIdentityDocument{
+	defaultClient.idDoc = &ec2metadata.EC2InstanceIdentityDocument{
 		Region:           "us-east-1",
 		AvailabilityZone: "us-east-1a",
 		InstanceType:     "r4.xlarge",
 	}
 
-	limits := ENILimits()
+	limits := defaultClient.ENILimits()
 	if limits.Adapters != 4 && limits.IPv4 != 15 {
 		t.Fatalf("No valid limit returned for r4.xlarge %v", limits)
 	}

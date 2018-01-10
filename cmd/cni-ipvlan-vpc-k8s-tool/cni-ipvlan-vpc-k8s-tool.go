@@ -54,7 +54,7 @@ func actionNewInterface(c *cli.Context) error {
 			fmt.Println("please specify security groups")
 			return fmt.Errorf("need security groups")
 		}
-		newIf, err := aws.NewInterface(secGrps, filters)
+		newIf, err := aws.DefaultClient.NewInterface(secGrps, filters)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -74,7 +74,7 @@ func actionRemoveInterface(c *cli.Context) error {
 			return fmt.Errorf("Insufficent Arguments")
 		}
 
-		if err := aws.RemoveInterface(interfaces); err != nil {
+		if err := aws.DefaultClient.RemoveInterface(interfaces); err != nil {
 			fmt.Println(err)
 			return err
 		}
@@ -99,7 +99,7 @@ func actionDeallocate(c *cli.Context) error {
 				return fmt.Errorf("IP parse error")
 			}
 
-			err := aws.DeallocateIP(&ip)
+			err := aws.DefaultClient.DeallocateIP(&ip)
 			if err != nil {
 				fmt.Printf("deallocation failed: %v\n", err)
 				return err
@@ -112,7 +112,7 @@ func actionDeallocate(c *cli.Context) error {
 func actionAllocate(c *cli.Context) error {
 	return cniipvlanvpck8s.LockfileRun(func() error {
 		index := c.Int("index")
-		res, err := aws.AllocateIPFirstAvailableAtIndex(index)
+		res, err := aws.DefaultClient.AllocateIPFirstAvailableAtIndex(index)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -142,7 +142,7 @@ func actionFreeIps(c *cli.Context) error {
 }
 
 func actionLimits(c *cli.Context) error {
-	limit := aws.ENILimits()
+	limit := aws.DefaultClient.ENILimits()
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 	fmt.Fprintln(w, "adapters\tipv4\tipv6\t")
 	fmt.Fprintf(w, "%v\t%v\t%v\t\n", limit.Adapters,
@@ -171,7 +171,7 @@ func actionAddr(c *cli.Context) error {
 }
 
 func actionEniIf(c *cli.Context) error {
-	interfaces, err := aws.GetInterfaces()
+	interfaces, err := aws.DefaultClient.GetInterfaces()
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -196,7 +196,7 @@ func actionEniIf(c *cli.Context) error {
 }
 
 func actionSubnets(c *cli.Context) error {
-	subnets, err := aws.GetSubnetsForInstance()
+	subnets, err := aws.DefaultClient.GetSubnetsForInstance()
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -218,7 +218,7 @@ func actionSubnets(c *cli.Context) error {
 }
 
 func main() {
-	if !aws.Available() {
+	if !aws.DefaultClient.Available() {
 		fmt.Fprintln(os.Stderr, "This command must be run from a running ec2 instance")
 		os.Exit(1)
 	}

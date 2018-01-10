@@ -20,14 +20,26 @@ var (
 	interfaceDetachAttempts       = 20 // interfaceDetachAttempts * interfaceDetachWaitTime = total wait time
 )
 
+// InterfaceClient provides methods for allocating and deallocating interfaces
+type InterfaceClient interface {
+	NewInterfaceOnSubnetAtIndex(index int, secGrps []string, subnet Subnet) (*Interface, error)
+	NewInterface(secGrps []string, requiredTags map[string]string) (*Interface, error)
+	RemoveInterface(interfaceIDs []string) error
+}
+
+type interfaceClient struct {
+	aws    *awsclient
+	subnet SubnetsClient
+}
+
 // NewInterfaceOnSubnetAtIndex creates a new Interface with a specified subnet and index
-func NewInterfaceOnSubnetAtIndex(index int, secGrps []string, subnet Subnet) (*Interface, error) {
-	client, err := newEC2()
+func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []string, subnet Subnet) (*Interface, error) {
+	client, err := c.aws.newEC2()
 	if err != nil {
 		return nil, err
 	}
 
-	idDoc, err := getIDDoc()
+	idDoc, err := c.aws.getIDDoc()
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +97,7 @@ func NewInterfaceOnSubnetAtIndex(index int, secGrps []string, subnet Subnet) (*I
 	}
 
 	for start := time.Now(); time.Since(start) <= interfaceSettleTime; time.Sleep(interfacePollWaitTime) {
-		newInterfaces, err := GetInterfaces()
+		newInterfaces, err := c.aws.GetInterfaces()
 		if err != nil {
 			// The metadata server is inconsistent - for example, not
 			// all of the nodes under the interface will populate at once
@@ -123,13 +135,13 @@ func configureInterface(intf *Interface) {
 }
 
 // NewInterface creates an Interface based on specified parameters
-func NewInterface(secGrps []string, requiredTags map[string]string) (*Interface, error) {
-	subnets, err := GetSubnetsForInstance()
+func (c *interfaceClient) NewInterface(secGrps []string, requiredTags map[string]string) (*Interface, error) {
+	subnets, err := c.subnet.GetSubnetsForInstance()
 	if err != nil {
 		return nil, err
 	}
 
-	existingInterfaces, err := GetInterfaces()
+	existingInterfaces, err := c.aws.GetInterfaces()
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +150,7 @@ func NewInterface(secGrps []string, requiredTags map[string]string) (*Interface,
 		return nil, fmt.Errorf("not enough available subnets to make a new interface")
 	}
 
-	limits := ENILimits()
+	limits := c.aws.ENILimits()
 	if len(existingInterfaces) >= limits.Adapters {
 		return nil, fmt.Errorf("too many adapters on this instance already")
 	}
@@ -174,14 +186,14 @@ OUTER:
 		return nil, fmt.Errorf("No subnets are available which haven't already been used")
 	}
 
-	return NewInterfaceOnSubnetAtIndex(len(existingInterfaces), secGrps, availableSubnets[0])
+	return c.NewInterfaceOnSubnetAtIndex(len(existingInterfaces), secGrps, availableSubnets[0])
 }
 
 // RemoveInterface gracefull shutdown and removal of interfaces
 // Simply detach the interface, wait for it to come down and then
 // removes.
-func RemoveInterface(interfaceIDs []string) error {
-	client, err := newEC2()
+func (c *awsclient) RemoveInterface(interfaceIDs []string) error {
+	client, err := c.newEC2()
 	if err != nil {
 		return err
 	}
@@ -190,7 +202,7 @@ func RemoveInterface(interfaceIDs []string) error {
 		// TODO: check if there is any other interface on this namespace?
 
 		// We need the interface AttachmentId to detach
-		interfaceDescription, err := describeNetworkInterface(interfaceID)
+		interfaceDescription, err := c.describeNetworkInterface(interfaceID)
 		if err != nil {
 			return err
 		}
@@ -209,7 +221,7 @@ func RemoveInterface(interfaceIDs []string) error {
 		}
 
 		// Wait for the interface to be removed
-		if err := waitUtilInterfaceDetaches(interfaceID); err != nil {
+		if err := c.waitUtilInterfaceDetaches(interfaceID); err != nil {
 			return err
 		}
 
@@ -217,15 +229,15 @@ func RemoveInterface(interfaceIDs []string) error {
 		time.Sleep(interfacePostDetachSettleTime)
 
 		// Now we can safely remove the interface
-		if err := deleteInterface(interfaceID); err != nil {
+		if err := c.deleteInterface(interfaceID); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func deleteInterface(interfaceID string) error {
-	client, err := newEC2()
+func (c *awsclient) deleteInterface(interfaceID string) error {
+	client, err := c.newEC2()
 	if err != nil {
 		return err
 	}
@@ -238,17 +250,17 @@ func deleteInterface(interfaceID string) error {
 	return err
 }
 
-func waitUtilInterfaceDetaches(interfaceID string) error {
+func (c *awsclient) waitUtilInterfaceDetaches(interfaceID string) error {
 	var interfaceDescription *ec2.NetworkInterface
 
-	interfaceDescription, err := describeNetworkInterface(interfaceID)
+	interfaceDescription, err := c.describeNetworkInterface(interfaceID)
 	if err != nil {
 		return err
 	}
 
 	// Once the ENI is in available state, we are ok to delete it
 	for attempt := 0; *interfaceDescription.Status != "available"; attempt++ {
-		interfaceDescription, err = describeNetworkInterface(interfaceID)
+		interfaceDescription, err = c.describeNetworkInterface(interfaceID)
 		if err != nil {
 			return err
 		}
@@ -263,8 +275,8 @@ func waitUtilInterfaceDetaches(interfaceID string) error {
 	return nil
 }
 
-func describeNetworkInterface(interfaceID string) (*ec2.NetworkInterface, error) {
-	client, err := newEC2()
+func (c *awsclient) describeNetworkInterface(interfaceID string) (*ec2.NetworkInterface, error) {
+	client, err := c.newEC2()
 	if err != nil {
 		return nil, err
 	}

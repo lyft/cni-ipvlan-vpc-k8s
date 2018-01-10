@@ -7,15 +7,15 @@ import (
 )
 
 func TestClientCreate(t *testing.T) {
-	oldIDDoc := _idDoc
-	defer func() { _idDoc = oldIDDoc }()
+	oldIDDoc := defaultClient.idDoc
+	defer func() { defaultClient.idDoc = oldIDDoc }()
 
-	_idDoc = &ec2metadata.EC2InstanceIdentityDocument{
+	defaultClient.idDoc = &ec2metadata.EC2InstanceIdentityDocument{
 		Region:           "us-east-1",
 		AvailabilityZone: "us-east-1a",
 	}
 
-	client, err := newEC2()
+	client, err := defaultClient.newEC2()
 	if err != nil {
 		t.Errorf("Error generated %v", err)
 	}
@@ -24,7 +24,7 @@ func TestClientCreate(t *testing.T) {
 		t.Errorf("No client returned %v", err)
 	}
 
-	client2, err := newEC2()
+	client2, err := defaultClient.newEC2()
 	if client != client2 {
 		t.Errorf("Clients returned were not identical (no caching)")
 	}
