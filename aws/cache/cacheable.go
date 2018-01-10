@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	cacheRoot    = "/var/run/user"
+	cacheRoot    = "/run/user"
 	cacheProgram = "cni-ipvlan-vpc-k8s"
 )
 
@@ -69,7 +69,7 @@ func ensureDirectory() error {
 		return nil
 	}
 
-	err = os.Mkdir(cachePath, os.ModeDir|0700)
+	err = os.MkdirAll(cachePath, os.ModeDir|0700)
 	return err
 }
 
