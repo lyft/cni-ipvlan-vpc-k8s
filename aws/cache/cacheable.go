@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	cacheRoot    = "/run/user"
+	cacheRoot    = "/run"
 	cacheProgram = "cni-ipvlan-vpc-k8s"
 )
 
@@ -28,7 +28,12 @@ const (
 )
 
 func cachePath() string {
-	return path.Join(cacheRoot, fmt.Sprintf("%d", os.Getuid()), cacheProgram)
+	uid := os.Getuid()
+	if uid != 0 {
+		return path.Join(cacheRoot, "user", fmt.Sprintf("%d", os.Getuid()), cacheProgram)
+	}
+
+	return path.Join(cacheRoot, cacheProgram)
 }
 
 // JSONTime is a RFC3339 encoded time with JSON marshallers
