@@ -23,7 +23,7 @@ type awsclient struct {
 }
 
 type combinedClient struct {
-	*subnetsClient
+	*subnetsCacheClient
 	*awsclient
 	*interfaceClient
 	*allocateClient
@@ -50,7 +50,7 @@ func init() {
 		1 * time.Minute,
 	}
 	defaultClient = &combinedClient{
-		&subnetsClient{awsClient},
+		subnets,
 		awsClient,
 		&interfaceClient{awsClient, subnets},
 		&allocateClient{awsClient, subnets},
