@@ -149,8 +149,15 @@ func cmdAdd(args *skel.CmdArgs) error {
 	result.IPs = append(result.IPs, ipconfig)
 	result.Interfaces = append(result.Interfaces, iface)
 
+	cidrs := alloc.Interface.VpcCidrs
+	if aws.HasBugBrokenVPCCidrs(aws.DefaultClient) {
+		cidrs, err = aws.DefaultClient.DescribeVPCCIDRs(alloc.Interface.VpcID)
+		if err != nil {
+			return fmt.Errorf("Unable to enumerate CIDRs from the AWS API due to a specific meta-data bug %v", err)
+		}
+	}
 	// add routes for all VPC cidrs via the subnet gateway
-	for _, dst := range alloc.Interface.VpcCidrs {
+	for _, dst := range cidrs {
 		result.Routes = append(result.Routes, &types.Route{*dst, gw})
 	}
 
