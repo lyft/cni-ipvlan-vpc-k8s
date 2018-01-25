@@ -65,6 +65,18 @@ func actionNewInterface(c *cli.Context) error {
 	})
 }
 
+func actionBugs(c *cli.Context) error {
+	return cniipvlanvpck8s.LockfileRun(func() error {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+		fmt.Fprintln(w, "bug\tafflicted\t")
+		for _, bug := range aws.ListBugs(aws.DefaultClient) {
+			fmt.Fprintf(w, "%s\t%s\t\n", bug.Name, bug.HasBug())
+		}
+		w.Flush()
+		return nil
+	})
+}
+
 func actionRemoveInterface(c *cli.Context) error {
 	return cniipvlanvpck8s.LockfileRun(func() error {
 		interfaces := c.Args()
@@ -195,6 +207,27 @@ func actionEniIf(c *cli.Context) error {
 	return nil
 }
 
+func actionVpcCidr(c *cli.Context) error {
+	interfaces, err := aws.DefaultClient.GetInterfaces()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+	fmt.Fprintln(w, "iface\tmetadata cidr\taws api cidr\t")
+	for _, iface := range interfaces {
+		apiCidrs, _ := aws.DefaultClient.DescribeVPCCIDRs(iface.VpcID)
+
+		fmt.Fprintf(w, "%s\t%v\t%v\t\n",
+			iface.LocalName(),
+			iface.VpcCidrs,
+			apiCidrs)
+	}
+	w.Flush()
+	return nil
+}
+
 func actionSubnets(c *cli.Context) error {
 	subnets, err := aws.DefaultClient.GetSubnetsForInstance()
 	if err != nil {
@@ -286,6 +319,16 @@ func main() {
 			Name:   "limits",
 			Usage:  "Display limits for ENI for this instance type",
 			Action: actionLimits,
+		},
+		{
+			Name:   "bugs",
+			Usage:  "Show any bugs associated with this instance",
+			Action: actionBugs,
+		},
+		{
+			Name:   "vpccidr",
+			Usage:  "Show the VPC CIDRs associated with current interfaces",
+			Action: actionVpcCidr,
 		},
 	}
 	app.Version = version
