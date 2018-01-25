@@ -70,7 +70,7 @@ func actionBugs(c *cli.Context) error {
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 		fmt.Fprintln(w, "bug\tafflicted\t")
 		for _, bug := range aws.ListBugs(aws.DefaultClient) {
-			fmt.Fprintf(w, "%s\t%s\t\n", bug.Name, bug.HasBug())
+			fmt.Fprintf(w, "%s\t%v\t\n", bug.Name, bug.HasBug())
 		}
 		w.Flush()
 		return nil

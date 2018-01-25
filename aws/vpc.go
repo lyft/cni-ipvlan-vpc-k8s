@@ -44,7 +44,11 @@ func (v *vpcclient) DescribeVPCCIDRs(vpcID string) ([]*net.IPNet, error) {
 	req := &ec2.DescribeVpcsInput{
 		VpcIds: []*string{aws.String(vpcID)},
 	}
-	res, err := v.aws.ec2Client.DescribeVpcs(req)
+	ec2, err := v.aws.newEC2()
+	if err != nil {
+		return nil, err
+	}
+	res, err := ec2.DescribeVpcs(req)
 	if err != nil {
 		return nil, err
 	}
