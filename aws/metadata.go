@@ -197,5 +197,10 @@ func (c *awsclient) GetInterfaces() ([]Interface, error) {
 
 // InstanceType gets the type of the instance, i.e. "c5.large"
 func (c *awsclient) InstanceType() string {
-	return c.idDoc.InstanceType
+	id, err := c.getIDDoc()
+	if err != nil {
+		return "unknown"
+	}
+
+	return id.InstanceType
 }
