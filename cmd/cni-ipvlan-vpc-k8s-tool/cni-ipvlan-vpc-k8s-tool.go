@@ -228,6 +228,26 @@ func actionVpcCidr(c *cli.Context) error {
 	return nil
 }
 
+func actionVpcPeerCidr(c *cli.Context) error {
+	interfaces, err := aws.DefaultClient.GetInterfaces()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+	fmt.Fprintln(w, "iface\tpeer_dcidr\t")
+	for _, iface := range interfaces {
+		apiCidrs, _ := aws.DefaultClient.DescribeVPCPeerCIDRs(iface.VpcID)
+
+		fmt.Fprintf(w, "%s\t%v\t\n",
+			iface.LocalName(),
+			apiCidrs)
+	}
+	w.Flush()
+	return nil
+}
+
 func actionSubnets(c *cli.Context) error {
 	subnets, err := aws.DefaultClient.GetSubnetsForInstance()
 	if err != nil {
@@ -330,9 +350,14 @@ func main() {
 			Usage:  "Show the VPC CIDRs associated with current interfaces",
 			Action: actionVpcCidr,
 		},
+		{
+			Name:   "vpcpeercidr",
+			Usage:  "Show the peered VPC CIDRs associated with current interfaces",
+			Action: actionVpcPeerCidr,
+		},
 	}
 	app.Version = version
-	app.Copyright = "(c) 2017 Lyft Inc."
+	app.Copyright = "(c) 2017-2018 Lyft Inc."
 	app.Usage = "Interface with ENI adapters and CNI bindings for those"
 	app.Run(os.Args)
 }

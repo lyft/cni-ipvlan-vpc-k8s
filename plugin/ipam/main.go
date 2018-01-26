@@ -48,6 +48,7 @@ type IPAMConfig struct {
 	SubnetTags       map[string]string `json:"subnetTags"`
 	IfaceIndex       int               `json:"interfaceIndex"`
 	SkipDeallocation bool              `json:"skipDeallocation"`
+	RouteToVPCPeers  bool              `json:"routeToVpcPeers"`
 }
 
 func init() {
@@ -156,6 +157,15 @@ func cmdAdd(args *skel.CmdArgs) error {
 			return fmt.Errorf("Unable to enumerate CIDRs from the AWS API due to a specific meta-data bug %v", err)
 		}
 	}
+
+	if conf.IPAM.RouteToVPCPeers {
+		peerCidr, err := aws.DefaultClient.DescribeVPCPeerCIDRs(alloc.Interface.VpcID)
+		if err != nil {
+			return fmt.Errorf("unable to enumerate peer CIDrs %v", err)
+		}
+		cidrs = append(cidrs, peerCidr...)
+	}
+
 	// add routes for all VPC cidrs via the subnet gateway
 	for _, dst := range cidrs {
 		result.Routes = append(result.Routes, &types.Route{*dst, gw})
