@@ -27,6 +27,7 @@ type combinedClient struct {
 	*awsclient
 	*interfaceClient
 	*allocateClient
+	*vpcCacheClient
 }
 
 // Client offers all of the supporting AWS services
@@ -36,6 +37,7 @@ type Client interface {
 	MetadataClient
 	SubnetsClient
 	AllocateClient
+	VPCClient
 }
 
 var defaultClient *combinedClient
@@ -54,6 +56,10 @@ func init() {
 		awsClient,
 		&interfaceClient{awsClient, subnets},
 		&allocateClient{awsClient, subnets},
+		&vpcCacheClient{
+			&vpcclient{awsClient},
+			1 * time.Hour,
+		},
 	}
 
 	DefaultClient = defaultClient

@@ -40,6 +40,7 @@ func (a Interfaces) Less(i, j int) bool { return a[i].Number < a[j].Number }
 type MetadataClient interface {
 	Available() bool
 	GetInterfaces() ([]Interface, error)
+	InstanceType() string
 }
 
 // EC2 generally gives the following data blocks from an interface in meta-data
@@ -192,4 +193,14 @@ func (c *awsclient) GetInterfaces() ([]Interface, error) {
 	sort.Sort(Interfaces(interfaces))
 
 	return interfaces, nil
+}
+
+// InstanceType gets the type of the instance, i.e. "c5.large"
+func (c *awsclient) InstanceType() string {
+	id, err := c.getIDDoc()
+	if err != nil {
+		return "unknown"
+	}
+
+	return id.InstanceType
 }
