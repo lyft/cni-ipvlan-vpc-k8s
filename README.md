@@ -193,7 +193,8 @@ groups.
 Routes are automatically formed for the VPC on the `ipvlan` adapter.
 
 ipMasq is enabled to use the host-IP for egress to the Internet as
-well as providing access to services such as `kube2iam`.
+well as providing access to services such as `kube2iam`. `kube2iam` is
+not a dependency of this software.
 
 ```
 {
@@ -209,12 +210,12 @@ well as providing access to services such as `kube2iam`.
           "type": "cni-ipvlan-vpc-k8s-ipam",
           "interfaceIndex": 1,
 	      "subnetTags": {
-	      "kubernetes_kubelet": "true"
-	  },
-	  "secGroupIds": [
-	      "sg-1234",
-	      "sg-5678"
-	      ]
+	          "kubernetes_kubelet": "true"
+     	  },
+	      "secGroupIds": [
+	          "sg-1234",
+	          "sg-5678"
+	          ]
           }
     },
     {
@@ -227,6 +228,75 @@ well as providing access to services such as `kube2iam`.
     ]
 }
 ```
+
+### Other IPAM configuration flags
+
+In the above `ipam` block, several options are available:
+
+ - `interfaceIndex`: We also recommend never using the boot ENI
+   adapter with this plugin (though it is possible). By setting
+   `interfaceIndex` to 1, the plugin will only allocate IPs (and add
+   new adapters) starting at `eth1`.
+ - `subnetTags`: When allocating new adapters, by default the plugin
+   will use all available subnets within the availability zone. You
+   can restrict which subnets the plugin will use by specifying key /
+   value tag names that must be matched in order for the plugin to be
+   considered. These tags are set via the AWS API or in the AWS
+   Console on the subnet object.
+ - `secGroupIds`: When allocating a new ENI adapter, these interface
+   groups will be assigned to the adapter. Specify the `sg-xxxx`
+   interface group ID.
+ - `skipDeallocation`: `true` or `false` - when set to `true`, this
+   plugin will never remove a secondary IP address from an
+   adapter. Useful in workloads that churn many pods to reduce the AWS
+   ratelimits for configuring the VPC (which are low and cannot be
+   raised above a certain threshold). 
+ - `routeToVpcPeers`: `true` or `false` - When set to `true`, the
+   plugin will make a (cached) call to `DescribeVpcPeeringConnections`
+   to enumerate all peered VPCs. Routes will be added so connections
+   to these VPCs will be sourced from the IPvlan adapter in the pod
+   and not through the host masquerade. 
+
+## The CLI Tool
+
+This plugin ships a CLI tool which can be useful to inspect the state
+of the system or perform certain actions (such as provisioning an
+adapter at instance cloud-init time).
+
+Run `cni-ipvlan-vpc-k8s-tool --help` for a complete listing of
+options.
+
+    NAME:
+       cni-ipvlan-vpc-k8s-tool - Interface with ENI adapters and CNI bindings for those
+
+    USAGE:
+       cni-ipvlan-vpc-k8s-tool [global options] command [command options] [arguments...]
+
+    VERSION:
+       v-next
+
+    COMMANDS:
+         new-interface             Create a new interface
+         remove-interface          Remove an existing interface
+         deallocate                Deallocate a private IP
+         allocate-first-available  Allocate a private IP on the first available interface
+         free-ips                  List all currently unassigned AWS IP addresses
+         eniif                     List all ENI interfaces and their setup with addresses
+         addr                      List all bound IP addresses
+         subnets                   Show available subnets for this host
+         limits                    Display limits for ENI for this instance type
+         bugs                      Show any bugs associated with this instance
+         vpccidr                   Show the VPC CIDRs associated with current interfaces
+         vpcpeercidr               Show the peered VPC CIDRs associated with current interfaces
+         help, h                   Shows a list of commands or help for one command
+
+    GLOBAL OPTIONS:
+       --help, -h     show help
+       --version, -v  print the version
+
+    COPYRIGHT:
+       (c) 2017-2018 Lyft Inc.
+
 
 ## Security Considerations
 
