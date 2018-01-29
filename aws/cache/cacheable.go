@@ -6,6 +6,8 @@ import (
 	"os"
 	"path"
 	"time"
+
+	"github.com/lyft/cni-ipvlan-vpc-k8s/lib"
 )
 
 const (
@@ -36,35 +38,10 @@ func cachePath() string {
 	return path.Join(cacheRoot, cacheProgram)
 }
 
-// JSONTime is a RFC3339 encoded time with JSON marshallers
-type JSONTime struct {
-	time.Time
-}
-
-// MarshalJSON marshals a JSONTime to an RFC3339 string
-func (j *JSONTime) MarshalJSON() ([]byte, error) {
-	return json.Marshal(j.Time.Format(time.RFC3339))
-}
-
-// UnmarshalJSON unmarshals a JSONTime to a time.Time
-func (j *JSONTime) UnmarshalJSON(js []byte) error {
-	var rawString string
-	err := json.Unmarshal(js, &rawString)
-	if err != nil {
-		return err
-	}
-	t, err := time.Parse(time.RFC3339, rawString)
-	if err != nil {
-		return err
-	}
-	j.Time = t
-	return nil
-}
-
 // Cacheable defines metadata for objects which can be cached to files as JSON
 type Cacheable struct {
-	Expires  JSONTime    `json:"_expires"`
-	Contents interface{} `json":contents"`
+	Expires  lib.JSONTime `json:"_expires"`
+	Contents interface{}  `json":contents"`
 }
 
 func ensureDirectory() error {

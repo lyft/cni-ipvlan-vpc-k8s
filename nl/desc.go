@@ -50,12 +50,7 @@ func GetIPs() ([]BoundIP, error) {
 	var namespaces []string
 
 	files, err := ioutil.ReadDir("/var/run/netns/")
-	if err != nil {
-		if err != nil {
-			// Ignore this error
-		}
-		files = []os.FileInfo{}
-	} else {
+	if err == nil {
 		for _, file := range files {
 			namespaces = append(namespaces,
 				filepath.Join("/var/run/netns", file.Name()))

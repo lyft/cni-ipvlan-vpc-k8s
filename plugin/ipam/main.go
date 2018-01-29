@@ -30,9 +30,11 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 
-	"github.com/lyft/cni-ipvlan-vpc-k8s"
 	"github.com/lyft/cni-ipvlan-vpc-k8s/aws"
+	"github.com/lyft/cni-ipvlan-vpc-k8s/lib"
+	"github.com/lyft/cni-ipvlan-vpc-k8s/lib/freeip"
 	"github.com/lyft/cni-ipvlan-vpc-k8s/nl"
+	"github.com/lyft/cni-ipvlan-vpc-k8s/registry"
 )
 
 // PluginConf contains configuration parameters
@@ -87,8 +89,13 @@ func cmdAdd(args *skel.CmdArgs) error {
 	var alloc *aws.AllocationResult
 	// Try to find a free IP first - possibly from a broken container,
 	// or torn down namespace.
-	free, err := cniipvlanvpck8s.FindFreeIPsAtIndex(conf.IPAM.IfaceIndex)
+	free, err := freeip.FindFreeIPsAtIndex(conf.IPAM.IfaceIndex)
 	if err == nil && len(free) > 0 {
+		// Since we found this IP in the free list, remove it from
+		// the registry
+
+		registry := &registry.Registry{}
+		registry.ForgetIP(*free[0].IP)
 		alloc = free[0]
 	} else {
 		// allocate an IP on an available interface
@@ -185,7 +192,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	var addrs []netlink.Addr
 
 	// enter the namespace to grab the list of IPs
-	err = ns.WithNetNSPath(args.Netns, func(_ ns.NetNS) error {
+	_ = ns.WithNetNSPath(args.Netns, func(_ ns.NetNS) error {
 		iface, err := netlink.LinkByName(args.IfName)
 		if err != nil {
 			return err
@@ -200,6 +207,13 @@ func cmdDel(args *skel.CmdArgs) error {
 			aws.DefaultClient.DeallocateIP(&addr.IP)
 		}
 	}
+
+	// Mark this IP as free in the registry
+	registry := &registry.Registry{}
+	for _, addr := range addrs {
+		registry.TrackIP(addr.IP)
+	}
+
 	return nil
 }
 
@@ -208,5 +222,5 @@ func main() {
 		skel.PluginMain(cmdAdd, cmdDel, version.PluginSupports(version.Current()))
 		return nil
 	}
-	_ = cniipvlanvpck8s.LockfileRun(run)
+	_ = lib.LockfileRun(run)
 }

@@ -1,4 +1,4 @@
-package cniipvlanvpck8s
+package lib
 
 import (
 	"fmt"

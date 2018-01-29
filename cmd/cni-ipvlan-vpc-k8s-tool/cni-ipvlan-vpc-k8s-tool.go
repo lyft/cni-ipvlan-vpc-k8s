@@ -6,12 +6,15 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/urfave/cli"
 
-	"github.com/lyft/cni-ipvlan-vpc-k8s"
 	"github.com/lyft/cni-ipvlan-vpc-k8s/aws"
+	"github.com/lyft/cni-ipvlan-vpc-k8s/lib"
+	"github.com/lyft/cni-ipvlan-vpc-k8s/lib/freeip"
 	"github.com/lyft/cni-ipvlan-vpc-k8s/nl"
+	"github.com/lyft/cni-ipvlan-vpc-k8s/registry"
 )
 
 var version string
@@ -22,7 +25,7 @@ func filterBuild(input string) (map[string]string, error) {
 		return nil, nil
 	}
 
-	ret := make(map[string]string, 0)
+	ret := make(map[string]string)
 	tuples := strings.Split(input, ",")
 	for _, t := range tuples {
 		kv := strings.Split(t, "=")
@@ -40,7 +43,7 @@ func filterBuild(input string) (map[string]string, error) {
 }
 
 func actionNewInterface(c *cli.Context) error {
-	return cniipvlanvpck8s.LockfileRun(func() error {
+	return lib.LockfileRun(func() error {
 		filtersRaw := c.String("subnet_filter")
 		filters, err := filterBuild(filtersRaw)
 		if err != nil {
@@ -66,7 +69,7 @@ func actionNewInterface(c *cli.Context) error {
 }
 
 func actionBugs(c *cli.Context) error {
-	return cniipvlanvpck8s.LockfileRun(func() error {
+	return lib.LockfileRun(func() error {
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 		fmt.Fprintln(w, "bug\tafflicted\t")
 		for _, bug := range aws.ListBugs(aws.DefaultClient) {
@@ -78,7 +81,7 @@ func actionBugs(c *cli.Context) error {
 }
 
 func actionRemoveInterface(c *cli.Context) error {
-	return cniipvlanvpck8s.LockfileRun(func() error {
+	return lib.LockfileRun(func() error {
 		interfaces := c.Args()
 
 		if len(interfaces) <= 0 {
@@ -96,7 +99,7 @@ func actionRemoveInterface(c *cli.Context) error {
 }
 
 func actionDeallocate(c *cli.Context) error {
-	return cniipvlanvpck8s.LockfileRun(func() error {
+	return lib.LockfileRun(func() error {
 		releaseIps := c.Args()
 		for _, toRelease := range releaseIps {
 
@@ -122,7 +125,7 @@ func actionDeallocate(c *cli.Context) error {
 }
 
 func actionAllocate(c *cli.Context) error {
-	return cniipvlanvpck8s.LockfileRun(func() error {
+	return lib.LockfileRun(func() error {
 		index := c.Int("index")
 		res, err := aws.DefaultClient.AllocateIPFirstAvailableAtIndex(index)
 		if err != nil {
@@ -137,7 +140,7 @@ func actionAllocate(c *cli.Context) error {
 }
 
 func actionFreeIps(c *cli.Context) error {
-	ips, err := cniipvlanvpck8s.FindFreeIPsAtIndex(0)
+	ips, err := freeip.FindFreeIPsAtIndex(0)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -270,6 +273,60 @@ func actionSubnets(c *cli.Context) error {
 	return nil
 }
 
+func actionRegistryList(c *cli.Context) error {
+	return lib.LockfileRun(func() error {
+
+		reg := &registry.Registry{}
+		ips, err := reg.List()
+		if err != nil {
+			return err
+		}
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+		fmt.Fprintln(w, "ip\t")
+		for _, ip := range ips {
+			fmt.Fprintf(w, "%v\t\n",
+				ip)
+		}
+		w.Flush()
+		return nil
+	})
+}
+
+func actionRegistryGc(c *cli.Context) error {
+	return lib.LockfileRun(func() error {
+
+		reg := &registry.Registry{}
+		freeAfter := c.Duration("free-after")
+		if freeAfter <= 0*time.Second {
+			fmt.Fprintf(os.Stderr,
+				"Invalid duration specified. free-after must be > 0 seconds. Got %v. Please specify with --free-minutes=[time]\n", freeAfter)
+			return fmt.Errorf("invalid duration")
+		}
+
+		// Insert free-after jitter of 15% of the period
+		freeAfter = registry.Jitter(freeAfter, 0.15)
+
+		// Invert free-after
+		freeAfter *= -1
+
+		ips, err := reg.TrackedBefore(time.Now().Add(freeAfter))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return err
+		}
+		for _, ip := range ips {
+			err := aws.DefaultClient.DeallocateIP(&ip)
+			if err == nil {
+				reg.ForgetIP(ip)
+			} else {
+				fmt.Fprintf(os.Stderr, "Can't deallocate %v due to %v", ip, err)
+			}
+		}
+
+		return nil
+	})
+}
+
 func main() {
 	if !aws.DefaultClient.Available() {
 		fmt.Fprintln(os.Stderr, "This command must be run from a running ec2 instance")
@@ -354,6 +411,20 @@ func main() {
 			Name:   "vpcpeercidr",
 			Usage:  "Show the peered VPC CIDRs associated with current interfaces",
 			Action: actionVpcPeerCidr,
+		},
+		{
+			Name:   "registry-list",
+			Usage:  "List all known free IPs in the internal registry",
+			Action: actionRegistryList,
+		},
+		{
+			Name:   "registry-gc",
+			Usage:  "Free all IPs that have remained unused for a given time interval",
+			Action: actionRegistryGc,
+			Flags: []cli.Flag{
+				cli.DurationFlag{Name: "free-after",
+					Value: 0 * time.Second},
+			},
 		},
 	}
 	app.Version = version

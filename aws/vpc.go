@@ -101,7 +101,7 @@ func (v *vpcclient) DescribeVPCPeerCIDRs(vpcID string) ([]*net.IPNet, error) {
 	// and visible to the API, even if the CIDR is not active in
 	// one of the peered VPCs. We store all of the CIDRs in a map
 	// to de-duplicate them.
-	cidrs := make(map[string]bool, 0)
+	cidrs := make(map[string]bool)
 
 	for _, peering := range res.VpcPeeringConnections {
 		var peer *ec2.VpcPeeringConnectionVpcInfo

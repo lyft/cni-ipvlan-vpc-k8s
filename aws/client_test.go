@@ -25,7 +25,7 @@ func TestClientCreate(t *testing.T) {
 	}
 
 	client2, err := defaultClient.newEC2()
-	if client != client2 {
+	if client != client2 || err != nil {
 		t.Errorf("Clients returned were not identical (no caching)")
 	}
 

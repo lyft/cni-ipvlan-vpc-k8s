@@ -1,4 +1,4 @@
-package cniipvlanvpck8s
+package freeip
 
 import (
 	"github.com/lyft/cni-ipvlan-vpc-k8s/aws"
