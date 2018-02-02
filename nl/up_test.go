@@ -1,14 +1,13 @@
 package nl
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
 	"github.com/vishvananda/netlink"
 )
 
-func CreateTestInterface(name string) {
+func CreateTestInterface(t *testing.T, name string) {
 	lyftBridge := &netlink.Bridge{LinkAttrs: netlink.LinkAttrs{
 		TxQLen: -1,
 		Name:   name,
@@ -17,7 +16,7 @@ func CreateTestInterface(name string) {
 	err := netlink.LinkAdd(lyftBridge)
 	if err != nil {
 		RemoveInterface(name)
-		fmt.Errorf("Could not add %s: %v", lyftBridge.Name, err)
+		t.Errorf("Could not add %s: %v", lyftBridge.Name, err)
 	}
 
 	lyft1, _ := netlink.LinkByName(name)
@@ -30,7 +29,7 @@ func TestUpInterface(t *testing.T) {
 		return
 	}
 
-	CreateTestInterface("lyft1")
+	CreateTestInterface(t, "lyft1")
 	defer RemoveInterface("lyft1")
 
 	if err := UpInterface("lyft1"); err != nil {
@@ -44,7 +43,7 @@ func TestUpInterfacePoll(t *testing.T) {
 		return
 	}
 
-	CreateTestInterface("lyft2")
+	CreateTestInterface(t, "lyft2")
 	defer RemoveInterface("lyft2")
 
 	if err := UpInterfacePoll("lyft2"); err != nil {

@@ -157,7 +157,7 @@ func findFreeTable(start int) (int, error) {
 	}
 	// find first slot that's available for both V4 and V6 usage
 	for i := start; i < math.MaxUint32; i++ {
-		if allocatedTableIDs[i] == false {
+		if !allocatedTableIDs[i] {
 			return i, nil
 		}
 	}
@@ -471,7 +471,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	// If the device isn't there then don't try to clean up IP masq either.
 	var ipnets []netlink.Addr
 	vethPeerIndex := -1
-	err = ns.WithNetNSPath(args.Netns, func(_ ns.NetNS) error {
+	_ = ns.WithNetNSPath(args.Netns, func(_ ns.NetNS) error {
 		var err error
 
 		// lookup pod IPs from the args.IfName device (usually eth0)
@@ -494,7 +494,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		if err != nil && err != ip.ErrLinkNotFound {
 			return err
 		}
-		vethPeerIndex, err = netlink.VethPeerIndex(&netlink.Veth{LinkAttrs: *vethIface.Attrs()})
+		vethPeerIndex, _ = netlink.VethPeerIndex(&netlink.Veth{LinkAttrs: *vethIface.Attrs()})
 		return nil
 	})
 
@@ -507,7 +507,7 @@ func cmdDel(args *skel.CmdArgs) error {
 				addrBits = 32
 			}
 
-			err = ip.TeardownIPMasq(&net.IPNet{IP: ipn.IP, Mask: net.CIDRMask(addrBits, addrBits)}, chain, comment)
+			_ = ip.TeardownIPMasq(&net.IPNet{IP: ipn.IP, Mask: net.CIDRMask(addrBits, addrBits)}, chain, comment)
 		}
 
 		if vethPeerIndex != -1 {
