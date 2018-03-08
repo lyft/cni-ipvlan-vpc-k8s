@@ -110,6 +110,8 @@ func (v *vpcclient) DescribeVPCPeerCIDRs(vpcID string) ([]*net.IPNet, error) {
 			peer = peering.RequesterVpcInfo
 		} else if vpcID == *peering.RequesterVpcInfo.VpcId {
 			peer = peering.AccepterVpcInfo
+		} else {
+			continue
 		}
 
 		for _, cidrBlock := range peer.CidrBlockSet {
