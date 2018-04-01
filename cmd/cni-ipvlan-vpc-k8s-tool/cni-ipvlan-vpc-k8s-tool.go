@@ -405,7 +405,7 @@ func main() {
 		},
 		{
 			Name:   "maxpods",
-			Usage:  "Return a single number specifying the maximum number of pod addresses that can be use don this instance",
+			Usage:  "Return a single number specifying the maximum number of pod addresses that can be used on this instance",
 			Action: actionMaxPods,
 		},
 		{
