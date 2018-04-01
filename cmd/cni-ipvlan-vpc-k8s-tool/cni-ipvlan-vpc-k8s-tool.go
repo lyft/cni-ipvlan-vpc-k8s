@@ -167,6 +167,12 @@ func actionLimits(c *cli.Context) error {
 	return nil
 }
 
+func actionMaxPods(c *cli.Context) error {
+	limit := aws.DefaultClient.ENILimits()
+	fmt.Printf("%d\n", (limit.Adapters - 1) * limit.IPv4)
+	return nil
+}
+
 func actionAddr(c *cli.Context) error {
 	ips, err := nl.GetIPs()
 	if err != nil {
@@ -396,6 +402,11 @@ func main() {
 			Name:   "limits",
 			Usage:  "Display limits for ENI for this instance type",
 			Action: actionLimits,
+		},
+		{
+			Name:   "maxpods",
+			Usage:  "Return a single number specifying the maximum number of pod addresses that can be use don this instance",
+			Action: actionMaxPods,
 		},
 		{
 			Name:   "bugs",
