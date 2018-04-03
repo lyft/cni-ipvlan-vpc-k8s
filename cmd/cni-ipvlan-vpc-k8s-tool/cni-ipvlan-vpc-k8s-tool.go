@@ -169,7 +169,7 @@ func actionLimits(c *cli.Context) error {
 
 func actionMaxPods(c *cli.Context) error {
 	limit := aws.DefaultClient.ENILimits()
-	fmt.Printf("%d\n", (limit.Adapters - 1) * limit.IPv4)
+	fmt.Printf("%d\n", (limit.Adapters-1)*limit.IPv4)
 	return nil
 }
 
