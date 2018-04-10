@@ -12,6 +12,7 @@ import (
 type Interface struct {
 	ID     string
 	Mac    string
+	IfName string
 	Number int
 	IPv4s  []net.IP
 
@@ -26,7 +27,7 @@ type Interface struct {
 
 // LocalName returns the instance name in string form
 func (i Interface) LocalName() string {
-	return fmt.Sprintf("eth%d", i.Number)
+	return i.IfName
 }
 
 // Interfaces contains a slice of Interface
@@ -155,6 +156,23 @@ func (c *awsclient) getInterface(mac string) (Interface, error) {
 	}); err != nil {
 		return iface, err
 	}
+
+	// Retrieve interface name on host for this MAC address
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return iface, err
+	}
+	for _, i := range ifaces {
+		if i.HardwareAddr.String() == mac {
+			iface.IfName = i.Name
+			break
+		}
+	}
+	// Commented because the AWS metadata server can return MAC addreses from detached interfaces on c5/m5
+	// A cleaner fix would be to ignore bogus interfaces (but probably not the effort because it should get fixed soon)
+	//if iface.IfName  == "" {
+	//	return iface, fmt.Errorf("Unable to locate interface with mac %s on host", mac)
+	//}
 
 	return iface, nil
 }

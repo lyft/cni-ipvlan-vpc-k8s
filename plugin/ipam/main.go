@@ -137,7 +137,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		Mask: alloc.Interface.SubnetCidr.Mask,
 	}
 
-	master := fmt.Sprintf("eth%d", alloc.Interface.Number)
+	master := alloc.Interface.LocalName()
 
 	iface := &current.Interface{
 		Name: master,
