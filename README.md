@@ -155,7 +155,7 @@ traffic is the right future direction.
    the boot ENI adapter (eth0).
 1. AWS permissions allowing at least these actions on the _Kubelet_ role:
 
-        "ec2:DescribeSubets"
+        "ec2:DescribeSubnets"
         "ec2:AttachNetworkInterface"
         "ec2:AssignPrivateIpAddresses"
         "ec2:UnassignPrivateIpAddresses"
@@ -164,6 +164,15 @@ traffic is the right future direction.
         "ec2:DetachNetworkInterface"
         "ec2:DeleteNetworkInterface"
         "ec2:ModifyNetworkInterfaceAttribute"
+        "ec2:DescribeVpcs"
+        "ec2:DescribeVpcPeeringConnections"
+
+    ec2:DescribeVpcs is required for m5 and c5 instances because the AWS metadata
+    server does not return the secondary CIDR block on these instance types. This 
+    requirement will be removed when the issue is fixed.
+
+    ec2:DescribeVpcPeeringConnections is only required if routeToVpcPeers is
+    enabled on the plugin.
 
     See [Security Considerations](#security-considerations) below for more on
     the implications of these permissions.
