@@ -236,12 +236,7 @@ func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netl
 		containerInterface.Mac = contVeth0.HardwareAddr.String()
 		containerInterface.Sandbox = netns.Path()
 
-		for _, ipc := range pr.IPs {
-			// All addresses apply to the container veth interface
-			ipc.Interface = current.Int(1)
-		}
-
-		pr.Interfaces = []*current.Interface{hostInterface, containerInterface}
+		pr.Interfaces = append(pr.Interfaces, hostInterface, containerInterface)
 
 		contVeth, err := net.InterfaceByName(ifName)
 		if err != nil {
