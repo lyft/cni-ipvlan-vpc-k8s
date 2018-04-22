@@ -233,7 +233,9 @@ func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netl
 		hostInterface.Name = hostVeth.Name
 		hostInterface.Mac = hostVeth.HardwareAddr.String()
 		containerInterface.Name = contVeth0.Name
-		containerInterface.Mac = contVeth0.HardwareAddr.String()
+		// ip.SetupVeth does not retrieve MAC address from peer in veth
+		containerNetlinkIface, _ := netlink.LinkByName(contVeth0.Name)
+		containerInterface.Mac = containerNetlinkIface.Attrs().HardwareAddr.String()
 		containerInterface.Sandbox = netns.Path()
 
 		pr.Interfaces = append(pr.Interfaces, hostInterface, containerInterface)
