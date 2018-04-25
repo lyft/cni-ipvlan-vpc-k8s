@@ -94,7 +94,7 @@ func Store(key string, lifetime time.Duration, data interface{}) State {
 
 	key = path.Join(cachePath(), key)
 
-	file, err := os.OpenFile(key, os.O_RDWR|os.O_CREATE, 0600)
+	file, err := os.OpenFile(key, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return CacheNotAvailable
 	}
