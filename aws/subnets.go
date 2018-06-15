@@ -3,6 +3,7 @@ package aws
 import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/lyft/cni-ipvlan-vpc-k8s/aws/cache"
+	"github.com/pkg/errors"
 	"time"
 )
 
@@ -64,8 +65,19 @@ func (c *subnetsClient) GetSubnetsForInstance() ([]Subnet, error) {
 		return nil, err
 	}
 
+	// getting all interfaces attached to this specific machine so we can find out what is our vpc-id
+	// interfaces[0] is going to be our eth0, interfaces slice gets sorted by number before returning to the caller
+	interfaces, err := c.aws.GetInterfaces()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get interfaces associated with this EC2 machine")
+	}
+
 	input := &ec2.DescribeSubnetsInput{}
-	input.Filters = []*ec2.Filter{newEc2Filter("availabilityZone", az)}
+	input.Filters = []*ec2.Filter{
+		newEc2Filter("vpc-id", interfaces[0].VpcID),
+		newEc2Filter("availabilityZone", az),
+	}
+
 	result, err := ec2Client.DescribeSubnets(input)
 
 	if err != nil {
