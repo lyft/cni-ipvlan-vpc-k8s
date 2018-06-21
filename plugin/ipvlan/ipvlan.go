@@ -30,6 +30,7 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+// NetConf contains network configuration parameters
 type NetConf struct {
 	types.NetConf
 
