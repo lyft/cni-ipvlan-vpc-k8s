@@ -1,4 +1,4 @@
-package registry
+package aws
 
 import (
 	"encoding/json"
@@ -52,7 +52,7 @@ func registryPath() string {
 		return path.Join("/run/user", fmt.Sprintf("%d", uid), registryDir)
 	}
 
-	return path.Join("/var/lib", registryDir)
+	return path.Join("/run", registryDir)
 }
 
 func (r *Registry) ensurePath() (string, error) {
@@ -81,7 +81,17 @@ func (r *Registry) load() (*registryContents, error) {
 
 	file, err := os.Open(rpath)
 	if os.IsNotExist(err) {
-		// Return an empty registry
+		// Return an empty registry, prefilled with IPs
+		// already existing on all interfaces and timestamped
+		// at the golang epoch
+		free, err := FindFreeIPsAtIndex(0, false)
+		if err == nil {
+			for _, freeAlloc := range free {
+				contents.IPs[freeAlloc.IP.String()] = &registryIP{lib.JSONTime{time.Time{}}}
+			}
+			err = r.save(&contents)
+			return &contents, err
+		}
 		return &contents, nil
 	} else if err != nil {
 		return nil, err
@@ -117,7 +127,7 @@ func (r *Registry) save(rc *registryContents) error {
 	if err != nil {
 		return err
 	}
-	file, err := os.OpenFile(rpath, os.O_RDWR|os.O_CREATE, 0600)
+	file, err := os.OpenFile(rpath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -178,8 +188,8 @@ func (r *Registry) HasIP(ip net.IP) (bool, error) {
 }
 
 // TrackedBefore returns a list of all IPs last recorded time _before_
-// the time passed to this function. You probably want to call this with
-// time.Now().Add(-duration)
+// the time passed to this function. You probably want to call this
+// with time.Now().Add(-duration).
 func (r *Registry) TrackedBefore(t time.Time) ([]net.IP, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()

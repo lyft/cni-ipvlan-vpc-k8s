@@ -4,62 +4,128 @@
 [[projects]]
   name = "github.com/Microsoft/go-winio"
   packages = ["."]
-  revision = "78439966b38d69bf38227fbf57ac8a6fee70f69a"
-  version = "v0.4.5"
+  revision = "7da180ee92d8bd8bb8c37fc560e673e6557c392f"
+  version = "v0.4.7"
 
 [[projects]]
   name = "github.com/aws/aws-sdk-go"
-  packages = ["aws","aws/awserr","aws/awsutil","aws/client","aws/client/metadata","aws/corehandlers","aws/credentials","aws/credentials/ec2rolecreds","aws/credentials/endpointcreds","aws/credentials/stscreds","aws/defaults","aws/ec2metadata","aws/endpoints","aws/request","aws/session","aws/signer/v4","internal/shareddefaults","private/protocol","private/protocol/ec2query","private/protocol/query","private/protocol/query/queryutil","private/protocol/rest","private/protocol/xml/xmlutil","service/ec2","service/ec2/ec2iface","service/sts"]
-  revision = "03f37be7b3c2cec3a839ff74dea774c63819d45d"
-  version = "v1.12.50"
+  packages = [
+    "aws",
+    "aws/awserr",
+    "aws/awsutil",
+    "aws/client",
+    "aws/client/metadata",
+    "aws/corehandlers",
+    "aws/credentials",
+    "aws/credentials/ec2rolecreds",
+    "aws/credentials/endpointcreds",
+    "aws/credentials/stscreds",
+    "aws/defaults",
+    "aws/ec2metadata",
+    "aws/endpoints",
+    "aws/request",
+    "aws/session",
+    "aws/signer/v4",
+    "internal/sdkrand",
+    "internal/shareddefaults",
+    "private/protocol",
+    "private/protocol/ec2query",
+    "private/protocol/query",
+    "private/protocol/query/queryutil",
+    "private/protocol/rest",
+    "private/protocol/xml/xmlutil",
+    "service/ec2",
+    "service/ec2/ec2iface",
+    "service/sts"
+  ]
+  revision = "bff41fb23b7550368282029f6478819d6a99ae0f"
+  version = "v1.12.79"
 
 [[projects]]
   name = "github.com/containernetworking/cni"
-  packages = ["pkg/invoke","pkg/skel","pkg/types","pkg/types/020","pkg/types/current","pkg/version"]
+  packages = [
+    "pkg/invoke",
+    "pkg/skel",
+    "pkg/types",
+    "pkg/types/020",
+    "pkg/types/current",
+    "pkg/version"
+  ]
   revision = "a7885cb6f8ab03fba07852ded351e4f5e7a112bf"
   version = "v0.6.0"
 
 [[projects]]
   name = "github.com/containernetworking/plugins"
-  packages = ["pkg/ip","pkg/ipam","pkg/ns","pkg/utils","pkg/utils/hwaddr"]
-  revision = "7480240de9749f9a0a5c8614b17f1f03e0c06ab9"
-  version = "v0.6.0"
+  packages = [
+    "pkg/ip",
+    "pkg/ipam",
+    "pkg/ns",
+    "pkg/utils",
+    "pkg/utils/hwaddr",
+    "pkg/utils/sysctl"
+  ]
+  revision = "72b62babeeb3d7b25c9809ea9eb9fc9c02cc0f71"
+  version = "v0.7.1"
 
 [[projects]]
   name = "github.com/coreos/go-iptables"
   packages = ["iptables"]
-  revision = "259c8e6a4275d497442c721fa52204d7a58bde8b"
-  version = "v0.2.0"
+  revision = "b5b1876b170881a8259f036445ee89c8669db386"
+  version = "v0.3.0"
 
 [[projects]]
   name = "github.com/docker/distribution"
-  packages = ["digest","reference"]
+  packages = [
+    "digest",
+    "reference"
+  ]
   revision = "48294d928ced5dd9b378f7fd7c6f5da3ff3f2c89"
   version = "v2.6.2"
 
 [[projects]]
   name = "github.com/docker/docker"
-  packages = ["api/types","api/types/blkiodev","api/types/container","api/types/events","api/types/filters","api/types/mount","api/types/network","api/types/reference","api/types/registry","api/types/strslice","api/types/swarm","api/types/time","api/types/versions","api/types/volume","client","pkg/tlsconfig"]
+  packages = [
+    "api/types",
+    "api/types/blkiodev",
+    "api/types/container",
+    "api/types/events",
+    "api/types/filters",
+    "api/types/mount",
+    "api/types/network",
+    "api/types/reference",
+    "api/types/registry",
+    "api/types/strslice",
+    "api/types/swarm",
+    "api/types/time",
+    "api/types/versions",
+    "api/types/volume",
+    "client",
+    "pkg/tlsconfig"
+  ]
   revision = "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
   version = "v1.13.1"
 
 [[projects]]
   name = "github.com/docker/go-connections"
-  packages = ["nat","sockets","tlsconfig"]
+  packages = [
+    "nat",
+    "sockets",
+    "tlsconfig"
+  ]
   revision = "3ede32e2033de7505e6500d6c868c2b9ed9f169d"
   version = "v0.3.0"
 
 [[projects]]
   name = "github.com/docker/go-units"
   packages = ["."]
-  revision = "0dadbb0345b35ec7ef35e228dabb8de89a65bf52"
-  version = "v0.3.2"
+  revision = "47565b4f722fb6ceae66b95f853feed578a4a51c"
+  version = "v0.3.3"
 
 [[projects]]
   name = "github.com/go-ini/ini"
   packages = ["."]
-  revision = "32e4c1e6bc4e7d0d8451aa6b75200d19e37a536a"
-  version = "v1.32.0"
+  revision = "ace140f73450505f33e8b8418216792275ae82a7"
+  version = "v1.35.0"
 
 [[projects]]
   branch = "master"
@@ -91,10 +157,13 @@
   version = "v1.20.0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/vishvananda/netlink"
-  packages = [".","nl"]
-  revision = "3ff4c2196115d804aa1c747781ad2b2a5c73e140"
+  packages = [
+    ".",
+    "nl"
+  ]
+  revision = "a2ad57a690f3caf3015351d2d6e1c0b95c349752"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -105,18 +174,26 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
-  packages = ["context","context/ctxhttp","proxy"]
-  revision = "d866cfc389cec985d6fda2859936a575a55a3ab6"
+  packages = [
+    "context",
+    "context/ctxhttp",
+    "internal/socks",
+    "proxy"
+  ]
+  revision = "d41e8174641f662c5a2d1c7a5f9e828788eb8706"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  packages = ["unix","windows"]
-  revision = "571f7bbbe08da2a8955aed9d4db316e78630e9a3"
+  packages = [
+    "unix",
+    "windows"
+  ]
+  revision = "3ccc7e5779793fd54564baf60c51bf017955e0ba"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a69f2c698ef5fbbfe3262e490eaead96a0c123cc5c77d6cbcecbdc971bceb672"
+  inputs-digest = "b9c07db25ce0338c3512b88729bf1b13670c051360a223c73bfe292e637625a7"
   solver-name = "gps-cdcl"
   solver-version = 1

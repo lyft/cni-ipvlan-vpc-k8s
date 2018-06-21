@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -32,25 +33,19 @@ import (
 
 	"github.com/lyft/cni-ipvlan-vpc-k8s/aws"
 	"github.com/lyft/cni-ipvlan-vpc-k8s/lib"
-	"github.com/lyft/cni-ipvlan-vpc-k8s/lib/freeip"
 	"github.com/lyft/cni-ipvlan-vpc-k8s/nl"
-	"github.com/lyft/cni-ipvlan-vpc-k8s/registry"
 )
 
 // PluginConf contains configuration parameters
 type PluginConf struct {
-	Name       string      `json:"name"`
-	CNIVersion string      `json:"cniVersion"`
-	IPAM       *IPAMConfig `json:"ipam"`
-}
-
-// IPAMConfig contains IPAM driver configuration parameters
-type IPAMConfig struct {
+	Name             string            `json:"name"`
+	CNIVersion       string            `json:"cniVersion"`
 	SecGroupIds      []string          `json:"secGroupIds"`
 	SubnetTags       map[string]string `json:"subnetTags"`
 	IfaceIndex       int               `json:"interfaceIndex"`
 	SkipDeallocation bool              `json:"skipDeallocation"`
 	RouteToVPCPeers  bool              `json:"routeToVpcPeers"`
+	ReuseIPWait      int               `json:"reuseIPWait"`
 }
 
 func init() {
@@ -62,17 +57,15 @@ func init() {
 
 // parseConfig parses the supplied configuration from stdin.
 func parseConfig(stdin []byte) (*PluginConf, error) {
-	conf := PluginConf{}
+	conf := PluginConf{
+		ReuseIPWait: 60, // default 60 second wait
+	}
 
 	if err := json.Unmarshal(stdin, &conf); err != nil {
 		return nil, fmt.Errorf("failed to parse network configuration: %v", err)
 	}
 
-	if conf.IPAM == nil {
-		return nil, fmt.Errorf("IPAM config missing 'ipam' key")
-	}
-
-	if conf.IPAM.SecGroupIds == nil {
+	if conf.SecGroupIds == nil {
 		return nil, fmt.Errorf("secGroupIds must be specified")
 	}
 
@@ -87,22 +80,37 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	var alloc *aws.AllocationResult
-	// Try to find a free IP first - possibly from a broken container,
-	// or torn down namespace.
-	free, err := freeip.FindFreeIPsAtIndex(conf.IPAM.IfaceIndex)
-	if err == nil && len(free) > 0 {
-		// Since we found this IP in the free list, remove it from
-		// the registry
+	registry := &aws.Registry{}
 
-		registry := &registry.Registry{}
-		registry.ForgetIP(*free[0].IP)
-		alloc = free[0]
-	} else {
+	// Try to find a free IP first - possibly from a broken
+	// container, or torn down namespace. IP must also be at least
+	// conf.ReuseIPWait seconds old in the registry to be
+	// considered for use.
+	free, err := aws.FindFreeIPsAtIndex(conf.IfaceIndex, true)
+	if err == nil && len(free) > 0 {
+		registryFreeIPs, err := registry.TrackedBefore(time.Now().Add(time.Duration(-conf.ReuseIPWait) * time.Second))
+		if err == nil && len(registryFreeIPs) > 0 {
+		loop:
+			for _, freeAlloc := range free {
+				for _, freeRegistry := range registryFreeIPs {
+					if freeAlloc.IP.Equal(freeRegistry) {
+						alloc = freeAlloc
+						// update timestamp
+						registry.TrackIP(freeRegistry)
+						break loop
+					}
+				}
+			}
+		}
+	}
+
+	// No free IPs available for use, so let's allocate one
+	if alloc == nil {
 		// allocate an IP on an available interface
-		alloc, err = aws.DefaultClient.AllocateIPFirstAvailableAtIndex(conf.IPAM.IfaceIndex)
+		alloc, err = aws.DefaultClient.AllocateIPFirstAvailableAtIndex(conf.IfaceIndex)
 		if err != nil {
 			// failed, so attempt to add an IP to a new interface
-			newIf, err := aws.DefaultClient.NewInterface(conf.IPAM.SecGroupIds, conf.IPAM.SubnetTags)
+			newIf, err := aws.DefaultClient.NewInterface(conf.SecGroupIds, conf.SubnetTags)
 			// If this interface has somehow gained more than one IP since being allocated,
 			// abort this process and let a subsequent run find a valid IP.
 			if err != nil || len(newIf.IPv4s) != 1 {
@@ -116,13 +124,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 				*newIf,
 			}
 		}
-	}
-
-	err = nl.UpInterfacePoll(alloc.Interface.LocalName())
-	if err != nil {
-		return fmt.Errorf("unable to bring up interface %v due to %v",
-			alloc.Interface.LocalName(),
-			err)
 	}
 
 	// Per https://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/VPC_Subnets.html
@@ -141,6 +142,13 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	iface := &current.Interface{
 		Name: master,
+	}
+
+	// Ensure the master interface is always up
+	err = nl.UpInterfacePoll(master)
+	if err != nil {
+		return fmt.Errorf("unable to bring up interface %v due to %v",
+			master, err)
 	}
 
 	ipconfig := &current.IPConfig{
@@ -165,7 +173,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 	}
 
-	if conf.IPAM.RouteToVPCPeers {
+	if conf.RouteToVPCPeers {
 		peerCidr, err := aws.DefaultClient.DescribeVPCPeerCIDRs(alloc.Interface.VpcID)
 		if err != nil {
 			return fmt.Errorf("unable to enumerate peer CIDrs %v", err)
@@ -177,6 +185,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 	for _, dst := range cidrs {
 		result.Routes = append(result.Routes, &types.Route{*dst, gw})
 	}
+
+	// remove the IP from the registry just before handing off to ipvlan
+	registry.ForgetIP(*alloc.IP)
 
 	return types.PrintResult(result, conf.CNIVersion)
 }
@@ -201,7 +212,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		return err
 	})
 
-	if !conf.IPAM.SkipDeallocation {
+	if !conf.SkipDeallocation {
 		// deallocate IPs outside of the namespace so creds are correct
 		for _, addr := range addrs {
 			aws.DefaultClient.DeallocateIP(&addr.IP)
@@ -209,7 +220,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 
 	// Mark this IP as free in the registry
-	registry := &registry.Registry{}
+	registry := &aws.Registry{}
 	for _, addr := range addrs {
 		registry.TrackIP(addr.IP)
 	}

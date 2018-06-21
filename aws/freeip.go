@@ -1,7 +1,6 @@
-package freeip
+package aws
 
 import (
-	"github.com/lyft/cni-ipvlan-vpc-k8s/aws"
 	"github.com/lyft/cni-ipvlan-vpc-k8s/nl"
 )
 
@@ -10,10 +9,11 @@ import (
 // within netlink. This is inherently somewhat racey - for example
 // newly provisioned addresses may not show up immediately in metadata
 // and are subject to a few seconds of delay.
-func FindFreeIPsAtIndex(index int) ([]*aws.AllocationResult, error) {
-	freeIps := []*aws.AllocationResult{}
+func FindFreeIPsAtIndex(index int, updateRegistry bool) ([]*AllocationResult, error) {
+	freeIps := []*AllocationResult{}
+	registry := &Registry{}
 
-	interfaces, err := aws.DefaultClient.GetInterfaces()
+	interfaces, err := DefaultClient.GetInterfaces()
 	if err != nil {
 		return nil, err
 	}
@@ -37,12 +37,22 @@ func FindFreeIPsAtIndex(index int) ([]*aws.AllocationResult, error) {
 			if !found {
 				intfIPCopy := intfIP
 				// No match, record as free
-				freeIps = append(freeIps, &aws.AllocationResult{
+				freeIps = append(freeIps, &AllocationResult{
 					&intfIPCopy,
 					intf,
 				})
 			}
+			if updateRegistry {
+				if exists, err := registry.HasIP(intfIP); err == nil && !exists && !found {
+					// track IP as free if it hasn't been registered before
+					registry.TrackIP(intfIP)
+				} else if found {
+					// mark IP as in use
+					registry.ForgetIP(intfIP)
+				}
+			}
 		}
 	}
+
 	return freeIps, nil
 }

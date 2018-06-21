@@ -2,6 +2,7 @@ package aws
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"sort"
 	"time"
@@ -107,6 +108,9 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 		}
 		for _, intf := range newInterfaces {
 			if intf.Mac == *resp.NetworkInterface.MacAddress {
+				// New IP. Timestamp the addition as a free IP.
+				registry := &Registry{}
+				registry.TrackIP(net.ParseIP(*resp.NetworkInterface.PrivateIpAddress))
 				configureInterface(&intf)
 				return &intf, nil
 			}

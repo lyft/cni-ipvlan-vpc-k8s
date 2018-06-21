@@ -1,4 +1,4 @@
-package registry
+package aws
 
 import (
 	"net"
