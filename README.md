@@ -28,7 +28,7 @@ Kubernetes limit of 110 pods per instance.
 
 ## Features
 
-* Designed and tested on Kubernetes in AWS (v1.10 with CRI-O and Docker)
+* Designed and tested on Kubernetes in AWS (v1.10 with cri-o, docker, and containerd)
 * No overlay network; very low overhead with IPvlan
 * No external or local network services required outside of the AWS
   EC2 API; host-local scale up and scale down of network resources
