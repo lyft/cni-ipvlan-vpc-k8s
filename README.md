@@ -28,7 +28,7 @@ Kubernetes limit of 110 pods per instance.
 
 ## Features
 
-* Designed and tested on Kubernetes in AWS (v1.8 with CRI-O)
+* Designed and tested on Kubernetes in AWS (v1.10 with cri-o, docker, and containerd)
 * No overlay network; very low overhead with IPvlan
 * No external or local network services required outside of the AWS
   EC2 API; host-local scale up and scale down of network resources
@@ -128,6 +128,14 @@ traffic is the right future direction.
 
 # Using with Kubernetes
 
+## Supported container runtimes
+
+`cni-ipvlan-vpc-k8s` is used in production at Lyft with cri-o for
+non-GPU workloads and Docker w/ nvidia-docker for GPU workloads.
+
+Note that for cri-o, `manage_network_ns_lifecycle` *must* be set to
+true.
+
 ## Prerequisites
 
 1. By default, we use a secondary (and tertiary, ...) ENI adapter for
@@ -138,16 +146,17 @@ traffic is the right future direction.
    http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html
    Most hosts support > 1 adapter, except for some of the smallest
    hardware types.
-1. AWS VPC with a minimum number of subnets equal to the maximum
-   number of attached ENIs. In the normal case of supporting up to the
-   default 110 Pods per instance, you'll want five subnets (one for
-   the control plane on the boot ENI and four subnets for the Pod
-   ENIs). The example configuration uses adapter index 1 onward for
-   Pods. We recommend creating a secondary IPv4 CIDR block for
+1. AWS VPC with a recommended minimum number of subnets equal to the
+   maximum number of attached ENIs. In the normal case of supporting
+   up to the default 110 Pods per instance, you'll want five subnets
+   (one for the control plane on the boot ENI and four subnets for the
+   Pod ENIs). The example configuration uses adapter index 1 onward
+   for Pods. We recommend creating a secondary IPv4 CIDR block for
    Kubernetes deployments within existing VPCs and subnet
    appropriately for the number of ENIs.  In our primary region, we
    divide up our secondary IPv4 CIDR (/16) into 5 /20s per AZ with 3
-   AZs.
+   AZs. Datadog has provided code which removes the restriction on one
+   subnet per ENI; however, we've yet to test it thoroughly at Lyft.
 1. (Optional) AWS subnets tagged if you want to limit which ones can
    be used.
 1. The `kubelet` process _must_ be started with the `--node-ip` option
@@ -190,12 +199,11 @@ pinch, you may `go get -u github.com/golang/dep/cmd/dep`.
 
 ## Example Configuration
 
-This example CNI conflist uses the bundled modified
-`cni-ipvlan-vpc-k8s-ipvlan` plugin to create Pod IPs on the secondary
-and above ENI adapters and chains with the
-`cni-ipvlan-vpc-k8s-unnumbered-ptp` plugin to create unnumbered
-point-to-point links back to the default namespace from each Pod. New
-interfaces will be attached to subnets tagged with
+This example CNI conflist creates Pod IPs on the secondary and above
+ENI adapters and chains with the upstream ipvlan plugin (0.7.0 or
+later required) and the `cni-ipvlan-vpc-k8s-unnumbered-ptp` plugin to
+create unnumbered point-to-point links back to the default namespace
+from each Pod. New interfaces will be attached to subnets tagged with
 `kubernetes_kubelet` = `true`, and created with the defined security
 groups.
 
@@ -207,40 +215,41 @@ not a dependency of this software.
 
 ```
 {
-  "cniVersion": "0.3.1",
-  "name": "cni-ipvlan-vpc-k8s",
-  "plugins": [
-  {
-      "cniVersion": "0.3.1",
-      "type": "cni-ipvlan-vpc-k8s-ipvlan",
-      "mode": "l2",
-      "master": "ipam",
-      "ipam": {
-          "type": "cni-ipvlan-vpc-k8s-ipam",
-          "interfaceIndex": 1,
-	      "subnetTags": {
-	          "kubernetes_kubelet": "true"
-     	  },
-	      "secGroupIds": [
-	          "sg-1234",
-	          "sg-5678"
-	          ]
-          }
-    },
-    {
-        "cniVersion": "0.3.1",
-        "type": "cni-ipvlan-vpc-k8s-unnumbered-ptp",
-        "hostInterface": "eth0",
-        "containerInterface": "veth0",
-        "ipMasq": true
-    }
+    "cniVersion": "0.3.1",
+    "name": "cni-ipvlan-vpc-k8s",
+    "plugins": [
+	{
+	    "cniVersion": "0.3.1",
+	    "type": "cni-ipvlan-vpc-k8s-ipam",
+	    "interfaceIndex": 1,
+	    "subnetTags": {
+		"kubernetes_kubelet": "true"
+	    },
+	    "secGroupIds": [
+		"sg-1234",
+		"sg-5678"
+	    ]
+	},
+	{
+	    "cniVersion": "0.3.1",
+	    "type": "cni-ipvlan-vpc-k8s-ipvlan",
+	    "mode": "l2"
+	},
+	{
+	    "cniVersion": "0.3.1",
+	    "type": "cni-ipvlan-vpc-k8s-unnumbered-ptp",
+	    "hostInterface": "eth0",
+	    "containerInterface": "veth0",
+	    "ipMasq": true
+	}
     ]
 }
 ```
 
-### Other IPAM configuration flags
+### Other configuration flags
 
-In the above `ipam` block, several options are available:
+In the above `cni-ipvlan-vpc-k8s-ipam` config, several options are
+available:
 
  - `interfaceIndex`: We also recommend never using the boot ENI
    adapter with this plugin (though it is possible). By setting
@@ -264,7 +273,49 @@ In the above `ipam` block, several options are available:
    plugin will make a (cached) call to `DescribeVpcPeeringConnections`
    to enumerate all peered VPCs. Routes will be added so connections
    to these VPCs will be sourced from the IPvlan adapter in the pod
-   and not through the host masquerade. 
+   and not through the host masquerade.
+- `reuseIPWait`: Seconds to wait before free IP addresses are made
+   available for reuse by Pods. Defaults to 60 seconds. `reuseIPWait`
+   functions as both a lock to prevent addresses from being grabbed by
+   Pods spinning up in between the stages of chained CNI plugin
+   execution and as a method of delaying when a new Pod can grab the
+   same IP address of a terminating Pod.
+
+
+### IP address lifecycle management
+
+As new Pods are created, if needed, secondary IP addresses are added
+to secondary ENI adapters until they reach capacity. A lightweight
+file-based registry stores hints containing free IP addresses
+available to the instance to prevent unnecessary churn from adding and
+removing IPs to and from ENI adapters, which is a fairly heavyweight
+AWS process. By default, free IP addresses are made available for
+reuse by Pods after being unused for at least 60 seconds. To handle
+cases where IPs are not frequently reused by Pods, and an excess of
+free IP addresses becomes available on an instance, a systemd timer is
+recommended to garbage collect these old IPs.
+
+Sample cni-gc.service:
+```[Unit]
+Description=Garbage collect IPs unused for 15 minutes
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/cni-ipvlan-vpc-k8s-tool registry-gc --free-after=15m
+```
+
+Sample cni-gc.timer:
+```
+[Unit]
+Description=Run cni-gc every 5 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+```
 
 ## The CLI Tool
 
@@ -285,19 +336,21 @@ options.
        v-next
 
     COMMANDS:
-         new-interface             Create a new interface
-         remove-interface          Remove an existing interface
-         deallocate                Deallocate a private IP
-         allocate-first-available  Allocate a private IP on the first available interface
-         free-ips                  List all currently unassigned AWS IP addresses
-         eniif                     List all ENI interfaces and their setup with addresses
-         addr                      List all bound IP addresses
-         subnets                   Show available subnets for this host
-         limits                    Display limits for ENI for this instance type
-         bugs                      Show any bugs associated with this instance
-         vpccidr                   Show the VPC CIDRs associated with current interfaces
-         vpcpeercidr               Show the peered VPC CIDRs associated with current interfaces
-         help, h                   Shows a list of commands or help for one command
+	 new-interface             Create a new interface
+	 remove-interface          Remove an existing interface
+	 deallocate                Deallocate a private IP
+	 allocate-first-available  Allocate a private IP on the first available interface
+	 free-ips                  List all currently unassigned AWS IP addresses
+	 eniif                     List all ENI interfaces and their setup with addresses
+	 addr                      List all bound IP addresses
+	 subnets                   Show available subnets for this host
+	 limits                    Display limits for ENI for this instance type
+	 bugs                      Show any bugs associated with this instance
+	 vpccidr                   Show the VPC CIDRs associated with current interfaces
+	 vpcpeercidr               Show the peered VPC CIDRs associated with current interfaces
+	 registry-list             List all known free IPs in the internal registry
+	 registry-gc               Free all IPs that have remained unused for a given time interval
+	 help, h                   Shows a list of commands or help for one command
 
     GLOBAL OPTIONS:
        --help, -h     show help

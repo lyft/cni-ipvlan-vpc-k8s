@@ -5,7 +5,7 @@
 
 [[constraint]]
   name = "github.com/containernetworking/plugins"
-  version = "~0.6.0"
+  version = "~0.7.1"
 
 [[constraint]]
   name = "github.com/docker/docker"
@@ -18,7 +18,3 @@
 [[constraint]]
   name = "github.com/urfave/cli"
   version = "~1.20.0"
-
-[[constraint]]
-  name = "github.com/go-ini/ini"
-  version = "1.30.3"
