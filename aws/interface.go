@@ -108,9 +108,11 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 		}
 		for _, intf := range newInterfaces {
 			if intf.Mac == *resp.NetworkInterface.MacAddress {
-				// New IP. Timestamp the addition as a free IP.
-				registry := &Registry{}
-				registry.TrackIP(net.ParseIP(*resp.NetworkInterface.PrivateIpAddress))
+				if privateIpAddr := net.ParseIP(*resp.NetworkInterface.PrivateIpAddress); privateIpAddr != nil {
+					// New IP. Timestamp the addition as a free IP.
+					registry := &Registry{}
+					registry.TrackIP(privateIpAddr)
+				}
 				configureInterface(&intf)
 				return &intf, nil
 			}
