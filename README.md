@@ -175,9 +175,10 @@ true.
         "ec2:ModifyNetworkInterfaceAttribute"
         "ec2:DescribeVpcs"
         "ec2:DescribeVpcPeeringConnections"
+        "ec2:DescribeRouteTables"
 
     ec2:DescribeVpcs is required for m5 and c5 instances because the AWS metadata
-    server does not return the secondary CIDR block on these instance types. This 
+    server does not return the secondary CIDR block on these instance types. This
     requirement will be removed when the issue is fixed.
 
     ec2:DescribeVpcPeeringConnections is only required if routeToVpcPeers is
@@ -268,12 +269,25 @@ available:
    plugin will never remove a secondary IP address from an
    adapter. Useful in workloads that churn many pods to reduce the AWS
    ratelimits for configuring the VPC (which are low and cannot be
-   raised above a certain threshold). 
+   raised above a certain threshold).
  - `routeToVpcPeers`: `true` or `false` - When set to `true`, the
    plugin will make a (cached) call to `DescribeVpcPeeringConnections`
    to enumerate all peered VPCs. Routes will be added so connections
    to these VPCs will be sourced from the IPvlan adapter in the pod
    and not through the host masquerade.
+- `routeToSubnetGw`: `true` or `false` - When set to `true`, the plugin
+   will make a (cached) call to `DescribeRouteTables` to get all routes
+   associated with the subnet of the ENI. All non-default routes whose
+   targets are not internet gateways will be configured on the IPvlan
+   adapter in the pod so connections to these IPs will not go through
+   the host masquerade. This feature is newer than routeToVpcPeers, and
+   should return a superset of those routes: in addition to peered VPCs,
+   it supports most current and future VPC connectivity options such as
+   Direct Connect and VPN gateways. The notable exception is
+   [VPC Gateway Endpoints](https://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/vpce-gateway.html)
+   (for managed services such as S3 and Dynamo DB) because they are
+   addressed by non-static lists of public IP addresses, which would
+   require actively updating routes while the pod is running.
 - `reuseIPWait`: Seconds to wait before free IP addresses are made
    available for reuse by Pods. Defaults to 60 seconds. `reuseIPWait`
    functions as both a lock to prevent addresses from being grabbed by

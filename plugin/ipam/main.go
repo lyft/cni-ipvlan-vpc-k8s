@@ -46,6 +46,7 @@ type PluginConf struct {
 	SkipDeallocation bool              `json:"skipDeallocation"`
 	RouteToVPCPeers  bool              `json:"routeToVpcPeers"`
 	ReuseIPWait      int               `json:"reuseIPWait"`
+	RouteToSubnetGw  bool              `json:"routeToSubnetGw"`
 }
 
 func init() {
@@ -176,13 +177,21 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if conf.RouteToVPCPeers {
 		peerCidr, err := aws.DefaultClient.DescribeVPCPeerCIDRs(alloc.Interface.VpcID)
 		if err != nil {
-			return fmt.Errorf("unable to enumerate peer CIDrs %v", err)
+			return fmt.Errorf("unable to enumerate peer CIDRs %v", err)
 		}
 		cidrs = append(cidrs, peerCidr...)
 	}
 
+	if conf.RouteToSubnetGw {
+		subnetCidrs, err := aws.DefaultClient.GetRoutesForSubnet(alloc.Interface.SubnetID)
+		if err != nil {
+			return fmt.Errorf("unable to enumerate subnet route table CIDRs %v", err)
+		}
+		cidrs = append(cidrs, subnetCidrs...)
+	}
+
 	// add routes for all VPC cidrs via the subnet gateway
-	for _, dst := range cidrs {
+	for _, dst := range lib.DeduplicateCidrs(cidrs) {
 		result.Routes = append(result.Routes, &types.Route{*dst, gw})
 	}
 

@@ -28,6 +28,7 @@ type combinedClient struct {
 	*interfaceClient
 	*allocateClient
 	*vpcCacheClient
+	*routeTablesCacheClient
 }
 
 // Client offers all of the supporting AWS services
@@ -38,6 +39,7 @@ type Client interface {
 	SubnetsClient
 	AllocateClient
 	VPCClient
+	RouteTablesClient
 }
 
 var defaultClient *combinedClient
@@ -59,6 +61,10 @@ func init() {
 		&vpcCacheClient{
 			&vpcclient{awsClient},
 			1 * time.Hour,
+		},
+		&routeTablesCacheClient{
+			&routeTablesClient{awsClient},
+			5 * time.Minute,
 		},
 	}
 
