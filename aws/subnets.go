@@ -1,7 +1,9 @@
 package aws
 
 import (
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/lyft/cni-ipvlan-vpc-k8s/aws/cache"
 	"github.com/pkg/errors"
 	"time"
@@ -47,7 +49,13 @@ func (s *subnetsCacheClient) GetSubnetsForInstance() (subnets []Subnet, err erro
 }
 
 type subnetsClient struct {
-	aws *awsclient
+	aws awsSubnetClient
+}
+
+type awsSubnetClient interface {
+	getIDDoc() (*ec2metadata.EC2InstanceIdentityDocument, error)
+	newEC2() (ec2iface.EC2API, error)
+	GetInterfaces() ([]Interface, error)
 }
 
 // GetSubnetsForInstance returns a list of subnets for the running instance
