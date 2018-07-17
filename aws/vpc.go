@@ -73,6 +73,10 @@ func (v *vpcclient) DescribeVPCCIDRs(vpcID string) ([]*net.IPNet, error) {
 
 	for _, vpc := range res.Vpcs {
 		for _, cblock := range vpc.CidrBlockAssociationSet {
+			// Avoid adding non associated CIDRs to routes
+			if *cblock.CidrBlockState.State != "associated" {
+				continue
+			}
 			_, parsed, err := net.ParseCIDR(*cblock.CidrBlock)
 			if err != nil {
 				return nil, err
