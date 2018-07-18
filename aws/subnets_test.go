@@ -9,6 +9,24 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 )
 
+type awsSubnetClientMock struct {
+	EC2Client         ec2iface.EC2API
+	InterfaceResponse []Interface
+	IDDocument        *ec2metadata.EC2InstanceIdentityDocument
+}
+
+func (m awsSubnetClientMock) getIDDoc() (*ec2metadata.EC2InstanceIdentityDocument, error) {
+	return m.IDDocument, nil
+}
+
+func (m awsSubnetClientMock) newEC2() (ec2iface.EC2API, error) {
+	return m.EC2Client, nil
+}
+
+func (m awsSubnetClientMock) GetInterfaces() ([]Interface, error) {
+	return m.InterfaceResponse, nil
+}
+
 type ec2SubnetsMock struct {
 	ec2iface.EC2API
 	Resp ec2.DescribeSubnetsOutput
@@ -45,16 +63,21 @@ func TestGetSubnetsForInstance(t *testing.T) {
 		},
 	}
 
-	oldIDDoc := defaultClient.idDoc
-	defer func() { defaultClient.idDoc = oldIDDoc }()
-
-	defaultClient.idDoc = &ec2metadata.EC2InstanceIdentityDocument{
-		Region:           "us-east-1",
-		AvailabilityZone: "us-east-1a",
-	}
-
 	for i, c := range cases {
-		defaultClient.ec2Client = &ec2SubnetsMock{Resp: c.Resp}
+		defaultClient.subnets = &subnetsClient{
+			aws: &awsSubnetClientMock{
+				EC2Client: &ec2SubnetsMock{Resp: c.Resp},
+				IDDocument: &ec2metadata.EC2InstanceIdentityDocument{
+					Region:           "us-east-1",
+					AvailabilityZone: "us-east-1a",
+				},
+				InterfaceResponse: []Interface{
+					{
+						VpcID: "vpc-id",
+					},
+				},
+			},
+		}
 
 		res, err := defaultClient.GetSubnetsForInstance()
 		if err != nil {
