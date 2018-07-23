@@ -44,7 +44,9 @@ func (s *subnetsCacheClient) GetSubnetsForInstance() (subnets []Subnet, err erro
 		return
 	}
 	subnets, err = s.subnets.GetSubnetsForInstance()
-	cache.Store("subnets_for_instance", s.expiration, &subnets)
+	if err == nil {
+		cache.Store("subnets_for_instance", s.expiration, &subnets)
+	}
 	return
 }
 
