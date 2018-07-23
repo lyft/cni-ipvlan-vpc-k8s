@@ -49,7 +49,7 @@ func init() {
 	awsClient := &awsclient{}
 	subnets := &subnetsCacheClient{
 		&subnetsClient{aws: awsClient},
-		1 * time.Minute,
+		5 * time.Minute,
 	}
 	defaultClient = &combinedClient{
 		subnets,
