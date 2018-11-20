@@ -30,7 +30,7 @@ func HasBugBrokenVPCCidrs(meta MetadataClient) bool {
 	itype := meta.InstanceType()
 	family := strings.Split(itype, ".")[0]
 	switch family {
-	case "c5", "m5":
+	case "c5", "m5", "c5d", "m5d", "m5a", "r5", "r5d", "r5a":
 		return true
 	default:
 		return false

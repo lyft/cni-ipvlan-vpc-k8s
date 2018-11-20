@@ -100,7 +100,7 @@ func (c *subnetsClient) GetSubnetsForInstance() ([]Subnet, error) {
 			Cidr:                  *awsSub.CidrBlock,
 			IsDefault:             *awsSub.DefaultForAz,
 			AvailableAddressCount: int(*awsSub.AvailableIpAddressCount),
-			Tags: map[string]string{},
+			Tags:                  map[string]string{},
 		}
 		// Set all the tags on the result
 		for _, tag := range awsSub.Tags {
