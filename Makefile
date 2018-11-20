@@ -21,7 +21,7 @@ cache:
 .PHONY: lint
 lint:
 	gometalinter.v2 --disable-all \
-		--enable=golint --enable=megacheck --enable=gas \
+		--enable=golint --enable=megacheck \
 		--enable=gofmt \
 		--deadline=10m --vendor ./... \
 		--exclude="Errors unhandled.*" \
