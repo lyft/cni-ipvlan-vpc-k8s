@@ -142,10 +142,7 @@ func setupSNAT(ifName string, comment string) error {
 		rulespec = append(rulespec, "--random-fully")
 	}
 	rulespec = append(rulespec, "-m", "comment", "--comment", comment)
-	if err := ipt.AppendUnique("nat", "POSTROUTING", rulespec...); err != nil {
-		return err
-	}
-	return nil
+	return ipt.AppendUnique("nat", "POSTROUTING", rulespec...)
 }
 
 func findFreeTable(start int) (int, error) {
