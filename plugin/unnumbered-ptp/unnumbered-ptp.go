@@ -137,7 +137,12 @@ func setupSNAT(ifName string, comment string) error {
 	if err != nil {
 		return fmt.Errorf("failed to locate iptables: %v", err)
 	}
-	if err := ipt.AppendUnique("nat", "POSTROUTING", "-o", ifName, "-j", "MASQUERADE", "-m", "comment", "--comment", comment); err != nil {
+	rulespec := []string{"-o", ifName, "-j", "MASQUERADE"}
+	if ipt.HasRandomFully() {
+		rulespec = append(rulespec, "--random-fully")
+	}
+	rulespec = append(rulespec, "-m", "comment", "--comment", comment)
+	if err := ipt.AppendUnique("nat", "POSTROUTING", rulespec...); err != nil {
 		return err
 	}
 	return nil
