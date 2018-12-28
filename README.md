@@ -5,7 +5,7 @@
 provide a simple, host-local, low latency, high throughput, and [compliant
 networking stack for
 Kubernetes](https://kubernetes.io/docs/concepts/cluster-administration/networking/#kubernetes-model)
-within [Amazon Virtual Private Coud
+within [Amazon Virtual Private Cloud
 (VPC)](https://aws.amazon.com/vpc/) environments by making use of
 [Amazon Elastic Network Interfaces
 (ENI)](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html)
