@@ -384,6 +384,7 @@ func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netl
 				LinkIndex: contVeth.Index,
 				Scope:     netlink.SCOPE_LINK,
 				Dst:       dstNet,
+				Gw:        hostAddrs[0].IP,
 			})
 
 			if err != nil {
