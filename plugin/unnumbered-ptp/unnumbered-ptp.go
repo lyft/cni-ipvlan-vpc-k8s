@@ -382,7 +382,6 @@ func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netl
 			}
 			err = netlink.RouteAdd(&netlink.Route{
 				LinkIndex: contVeth.Index,
-				Scope:     netlink.SCOPE_LINK,
 				Dst:       dstNet,
 				Gw:        hostAddrs[0].IP,
 			})
