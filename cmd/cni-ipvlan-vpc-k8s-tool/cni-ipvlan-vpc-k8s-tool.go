@@ -55,7 +55,7 @@ func actionNewInterface(c *cli.Context) error {
 			fmt.Println("please specify security groups")
 			return fmt.Errorf("need security groups")
 		}
-		newIf, err := aws.DefaultClient.NewInterface(secGrps, filters)
+		newIf, err := aws.DefaultClient.NewInterface(secGrps, filters, 1)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -125,7 +125,7 @@ func actionDeallocate(c *cli.Context) error {
 func actionAllocate(c *cli.Context) error {
 	return lib.LockfileRun(func() error {
 		index := c.Int("index")
-		res, err := aws.DefaultClient.AllocateIPFirstAvailableAtIndex(index)
+		res, err := aws.DefaultClient.AllocateIPsFirstAvailableAtIndex(index, 1)
 		if err != nil {
 			fmt.Println(err)
 			return err
