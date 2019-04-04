@@ -48,6 +48,7 @@ func actionNewInterface(c *cli.Context) error {
 			fmt.Printf("Invalid filter specification %v", err)
 			return err
 		}
+		ipBatchSize := c.Int64("ip_batch_size")
 
 		secGrps := c.Args()
 
@@ -55,7 +56,7 @@ func actionNewInterface(c *cli.Context) error {
 			fmt.Println("please specify security groups")
 			return fmt.Errorf("need security groups")
 		}
-		newIf, err := aws.DefaultClient.NewInterface(secGrps, filters, 1)
+		newIf, err := aws.DefaultClient.NewInterface(secGrps, filters, ipBatchSize)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -125,7 +126,8 @@ func actionDeallocate(c *cli.Context) error {
 func actionAllocate(c *cli.Context) error {
 	return lib.LockfileRun(func() error {
 		index := c.Int("index")
-		res, err := aws.DefaultClient.AllocateIPsFirstAvailableAtIndex(index, 1)
+		ipBatchSize := c.Int64("ip_batch_size")
+		res, err := aws.DefaultClient.AllocateIPsFirstAvailableAtIndex(index, ipBatchSize)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -376,6 +378,10 @@ func main() {
 					Name:  "subnet_filter",
 					Usage: "Comma separated key=value filters to restrict subnets",
 				},
+				cli.Int64Flag{
+					Name:  "ip_batch_size",
+					Usage: "Number of ips to allocate on the interface",
+				},
 			},
 		},
 		{
@@ -395,7 +401,13 @@ func main() {
 			Usage:  "Allocate a private IP on the first available interface",
 			Action: actionAllocate,
 			Flags: []cli.Flag{
-				cli.IntFlag{Name: "index"},
+				cli.IntFlag{
+					Name: "index",
+				},
+				cli.Int64Flag{
+					Name:  "ip_batch_size",
+					Usage: "Number of ips to allocate on the interface",
+				},
 			},
 		},
 		{
