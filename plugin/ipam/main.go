@@ -107,9 +107,11 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	// No free IPs available for use, so let's allocate one
 	if alloc == nil {
-		// allocate an IP on an available interface
-		alloc, err = aws.DefaultClient.AllocateIPsFirstAvailableAtIndex(conf.IfaceIndex, conf.IPBatchSize)
-		if err != nil {
+		// allocate IPs on an available interface
+		allocs, err := aws.DefaultClient.AllocateIPsFirstAvailableAtIndex(conf.IfaceIndex, conf.IPBatchSize)
+		if err == nil {
+			alloc = allocs[0]
+		} else {
 			// failed, so attempt to add an IP to a new interface
 			newIf, err := aws.DefaultClient.NewInterface(conf.SecGroupIds, conf.SubnetTags, conf.IPBatchSize)
 			if err != nil || len(newIf.IPv4s) < 1 {

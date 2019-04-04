@@ -17,9 +17,9 @@ type AllocationResult struct {
 
 // AllocateClient offers IP allocation on interfaces
 type AllocateClient interface {
-	AllocateIPsOn(intf Interface, batchSize int64) (*AllocationResult, error)
-	AllocateIPsFirstAvailableAtIndex(index int, batchSize int64) (*AllocationResult, error)
-	AllocateIPsFirstAvailable(batchSize int64) (*AllocationResult, error)
+	AllocateIPsOn(intf Interface, batchSize int64) ([]*AllocationResult, error)
+	AllocateIPsFirstAvailableAtIndex(index int, batchSize int64) ([]*AllocationResult, error)
+	AllocateIPsFirstAvailable(batchSize int64) ([]*AllocationResult, error)
 	DeallocateIP(ipToRelease *net.IP) error
 }
 
@@ -29,7 +29,8 @@ type allocateClient struct {
 }
 
 // AllocateIPOn allocates an IP on a specific interface.
-func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) (*AllocationResult, error) {
+func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) ([]*AllocationResult, error) {
+	var allocationResults []*AllocationResult
 	client, err := c.aws.newEC2()
 	if err != nil {
 		return nil, err
@@ -62,7 +63,6 @@ func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) (*Alloca
 		}
 
 		if len(newIntf.IPv4s) != len(intf.IPv4s) {
-			var retIP *net.IP
 			// New address detected
 			for _, newip := range newIntf.IPv4s {
 				found := false
@@ -76,15 +76,16 @@ func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) (*Alloca
 					if exists, err := registry.HasIP(newip); err == nil && !exists {
 						// New IP. Timestamp the addition as a free IP.
 						registry.TrackIP(newip)
-						retIP = &newip
+						allocationResult := &AllocationResult{
+							&newip,
+							newIntf,
+						}
+						allocationResults = append(allocationResults, allocationResult)
 					}
 				}
 			}
-			if retIP != nil {
-				return &AllocationResult{
-					retIP,
-					newIntf,
-				}, nil
+			if len(allocationResults) > 0 {
+				return allocationResults, nil
 			}
 		}
 		time.Sleep(1.0 * time.Second)
@@ -95,7 +96,7 @@ func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) (*Alloca
 
 // AllocateIPFirstAvailableAtIndex allocates an IP address, skipping any adapter < the given index
 // Returns a reference to the interface the IP was allocated on
-func (c *allocateClient) AllocateIPsFirstAvailableAtIndex(index int, batchSize int64) (*AllocationResult, error) {
+func (c *allocateClient) AllocateIPsFirstAvailableAtIndex(index int, batchSize int64) ([]*AllocationResult, error) {
 	interfaces, err := c.aws.GetInterfaces()
 	if err != nil {
 		return nil, err
@@ -134,7 +135,7 @@ func (c *allocateClient) AllocateIPsFirstAvailableAtIndex(index int, batchSize i
 
 // AllocateIPFirstAvailable allocates an IP address on the first available IP address
 // Returns a reference to the interface the IP was allocated on
-func (c *allocateClient) AllocateIPsFirstAvailable(batchSize int64) (*AllocationResult, error) {
+func (c *allocateClient) AllocateIPsFirstAvailable(batchSize int64) ([]*AllocationResult, error) {
 	return c.AllocateIPsFirstAvailableAtIndex(0, batchSize)
 }
 
