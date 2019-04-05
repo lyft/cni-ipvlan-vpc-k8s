@@ -28,7 +28,7 @@ type allocateClient struct {
 	subnet SubnetsClient
 }
 
-// AllocateIPOn allocates an IP on a specific interface.
+// AllocateIPsOn allocates IPs on a specific interface.
 func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) ([]*AllocationResult, error) {
 	var allocationResults []*AllocationResult
 	client, err := c.aws.newEC2()
@@ -76,8 +76,9 @@ func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) ([]*Allo
 					if exists, err := registry.HasIP(newip); err == nil && !exists {
 						// New IP. Timestamp the addition as a free IP.
 						registry.TrackIP(newip)
+						ipcopy := newip // Need to copy
 						allocationResult := &AllocationResult{
-							&newip,
+							&ipcopy,
 							newIntf,
 						}
 						allocationResults = append(allocationResults, allocationResult)
@@ -94,8 +95,8 @@ func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) ([]*Allo
 	return nil, fmt.Errorf("Can't locate new IP address from AWS")
 }
 
-// AllocateIPFirstAvailableAtIndex allocates an IP address, skipping any adapter < the given index
-// Returns a reference to the interface the IP was allocated on
+// AllocateIPsFirstAvailableAtIndex allocates IP addresses, skipping any adapter < the given index
+// Returns a reference to the interface the IPs were allocated on
 func (c *allocateClient) AllocateIPsFirstAvailableAtIndex(index int, batchSize int64) ([]*AllocationResult, error) {
 	interfaces, err := c.aws.GetInterfaces()
 	if err != nil {
@@ -133,8 +134,8 @@ func (c *allocateClient) AllocateIPsFirstAvailableAtIndex(index int, batchSize i
 	return nil, fmt.Errorf("Unable to allocate - no IPs available on any interfaces")
 }
 
-// AllocateIPFirstAvailable allocates an IP address on the first available IP address
-// Returns a reference to the interface the IP was allocated on
+// AllocateIPsFirstAvailable allocates IP addresses on the first available IP address
+// Returns a reference to the interface the IPs were allocated on
 func (c *allocateClient) AllocateIPsFirstAvailable(batchSize int64) ([]*AllocationResult, error) {
 	return c.AllocateIPsFirstAvailableAtIndex(0, batchSize)
 }

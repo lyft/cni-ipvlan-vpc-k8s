@@ -132,9 +132,10 @@ func actionAllocate(c *cli.Context) error {
 			fmt.Println(err)
 			return err
 		}
-		alloc := res[0]
+		for _, alloc := range res {
+			fmt.Printf("allocated %v on %v\n", alloc.IP, alloc.Interface.LocalName())
+		}
 
-		fmt.Printf("allocated %v on %v\n", alloc.IP, alloc.Interface.LocalName())
 		return nil
 
 	})
