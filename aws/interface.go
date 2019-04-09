@@ -113,7 +113,9 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 					registry := &Registry{}
 					registry.TrackIP(privateIPAddr)
 				}
-				configureInterface(&intf)
+				// Interfaces are sorted by device number. The first one is the main one
+				mainIf := newInterfaces[0].IfName
+				configureInterface(&intf, mainIf)
 				return &intf, nil
 			}
 		}
@@ -124,7 +126,7 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 }
 
 // Fire and forget method to configure an interface
-func configureInterface(intf *Interface) {
+func configureInterface(intf *Interface, mainIf string) {
 	// Found a match, going to try to make sure the interface is up
 	err := nl.UpInterfacePoll(intf.LocalName())
 	if err != nil {
@@ -133,7 +135,7 @@ func configureInterface(intf *Interface) {
 			intf.LocalName())
 		return
 	}
-	baseMtu, err := nl.GetMtu("eth0")
+	baseMtu, err := nl.GetMtu(mainIf)
 	if err != nil || baseMtu < 1000 || baseMtu > 9001 {
 		return
 	}
