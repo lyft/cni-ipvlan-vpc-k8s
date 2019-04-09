@@ -309,6 +309,8 @@ func actionRegistryList(c *cli.Context) error {
 func actionRegistryGc(c *cli.Context) error {
 	return lib.LockfileRun(func() error {
 
+		maxReap := c.Int("max-reap")
+
 		reg := &aws.Registry{}
 		freeAfter := c.Duration("free-after")
 		if freeAfter <= 0*time.Second {
@@ -347,8 +349,13 @@ func actionRegistryGc(c *cli.Context) error {
 			err := aws.DefaultClient.DeallocateIP(&ip)
 			if err == nil {
 				reg.ForgetIP(ip)
+				maxReap--
 			} else {
 				fmt.Fprintf(os.Stderr, "Can't deallocate %v due to %v", ip, err)
+			}
+			// max-reap specified as negative number will never reach 0 and reap all unused IPs
+			if maxReap == 0 {
+				return nil
 			}
 		}
 
@@ -381,7 +388,8 @@ func main() {
 				},
 				cli.Int64Flag{
 					Name:  "ip_batch_size",
-					Usage: "Number of ips to allocate on the interface",
+					Usage: "Number of ips to allocate on the interface. Specify 0 to max out the interface.",
+					Value: 1,
 				},
 			},
 		},
@@ -407,7 +415,8 @@ func main() {
 				},
 				cli.Int64Flag{
 					Name:  "ip_batch_size",
-					Usage: "Number of ips to allocate on the interface",
+					Usage: "Number of ips to allocate on the interface. Specify 0 to max out the interface.",
+					Value: 1,
 				},
 			},
 		},
@@ -469,8 +478,15 @@ func main() {
 			Usage:  "Free all IPs that have remained unused for a given time interval",
 			Action: actionRegistryGc,
 			Flags: []cli.Flag{
-				cli.DurationFlag{Name: "free-after",
-					Value: 0 * time.Second},
+				cli.DurationFlag{
+					Name:  "free-after",
+					Value: 0 * time.Second,
+				},
+				cli.IntFlag{
+					Name:  "max-reap",
+					Value: -1,
+					Usage: "Max number of ips to reap on a single run. -1 reaps all unused IPs",
+				},
 			},
 		},
 	}
