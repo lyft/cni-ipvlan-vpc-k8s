@@ -246,6 +246,7 @@
     "github.com/containernetworking/plugins/pkg/ipam",
     "github.com/containernetworking/plugins/pkg/ns",
     "github.com/containernetworking/plugins/pkg/utils",
+    "github.com/containernetworking/plugins/pkg/utils/sysctl",
     "github.com/coreos/go-iptables/iptables",
     "github.com/docker/docker/api/types",
     "github.com/docker/docker/client",

@@ -45,6 +45,7 @@ type PluginConf struct {
 	IfaceIndex       int               `json:"interfaceIndex"`
 	SkipDeallocation bool              `json:"skipDeallocation"`
 	RouteToVPCPeers  bool              `json:"routeToVpcPeers"`
+	ExtraRouteCIDR   []string          `json:"extraRouteCIDR"`
 	ReuseIPWait      int               `json:"reuseIPWait"`
 }
 
@@ -183,6 +184,14 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	// add routes for all VPC cidrs via the subnet gateway
 	for _, dst := range cidrs {
+		result.Routes = append(result.Routes, &types.Route{*dst, gw})
+	}
+
+	for _, dstStr := range conf.ExtraRouteCIDR {
+		_, dst, err := net.ParseCIDR(dstStr)
+		if err != nil {
+			return fmt.Errorf("unable to parse extra CIDRs: %s %v", dstStr, err)
+		}
 		result.Routes = append(result.Routes, &types.Route{*dst, gw})
 	}
 
