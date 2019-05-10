@@ -167,7 +167,13 @@ func actionLimits(c *cli.Context) error {
 
 func actionMaxPods(c *cli.Context) error {
 	limit := aws.DefaultClient.ENILimits()
-	fmt.Printf("%d\n", (limit.Adapters-1)*limit.IPv4)
+	specifiedMax := c.Int("max")
+	max := (limit.Adapters - 1) * limit.IPv4
+	if specifiedMax > 0 && specifiedMax < max {
+		// Limit the maximum to the CLI maximum
+		max = specifiedMax
+	}
+	fmt.Printf("%d\n", max)
 	return nil
 }
 
@@ -418,8 +424,11 @@ func main() {
 		},
 		{
 			Name:   "maxpods",
-			Usage:  "Return a single number specifying the maximum number of pod addresses that can be used on this instance",
+			Usage:  "Return a single number specifying the maximum number of pod addresses that can be used on this instance. Limit maximum with --max",
 			Action: actionMaxPods,
+			Flags: []cli.Flag{
+				cli.IntFlag{Name: "max"},
+			},
 		},
 		{
 			Name:   "bugs",
