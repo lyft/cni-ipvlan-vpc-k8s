@@ -12,7 +12,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 // This is a sample chained plugin that supports multiple CNI versions. It
 // parses prevResult according to the cniVersion
 package main
@@ -39,6 +38,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/j-keck/arping"
+	"github.com/lyft/cni-ipvlan-vpc-k8s/nl"
 	"github.com/vishvananda/netlink"
 )
 
@@ -111,6 +111,15 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 
 	if conf.HostInterface == "" {
 		return nil, fmt.Errorf("hostInterface must be specified")
+	}
+
+	// If the MTU is not set, use the one of the hostInterface
+	if conf.MTU == 0 {
+		baseMtu, err := nl.GetMtu(conf.HostInterface)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get MTU for hostInterface")
+		}
+		conf.MTU = baseMtu
 	}
 
 	if conf.ContainerInterface == "" {
