@@ -16,7 +16,7 @@ cache:
 
 .PHONY: lint
 lint:
-	golangci-lint run
+	golangci-lint run -D errcheck -D govet
 
 .PHONY: test
 test: cache
