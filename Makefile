@@ -16,15 +16,10 @@ cache:
 
 .PHONY: lint
 lint:
-	gometalinter.v2 --disable-all \
-		--enable=golint --enable=megacheck \
-		--enable=gofmt \
-		--deadline=10m --vendor ./... \
-		--exclude="Errors unhandled.*" \
-		--enable-gc
+	golangci-lint run
 
 .PHONY: test
-test: cache lint
+test: cache
 ifndef GOOS
 	go test -v ./aws/... ./nl ./cmd/cni-ipvlan-vpc-k8s-tool ./lib/...
 else
@@ -54,7 +49,6 @@ interactive-docker: test-docker
 
 .PHONY: ci
 ci:
-	go get -u gopkg.in/alecthomas/gometalinter.v2
-	gometalinter.v2 --install
-
+	go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.18.0
 	$(MAKE) all
+	$(MAKE) lint
