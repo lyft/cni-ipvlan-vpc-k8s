@@ -1,3 +1,10 @@
+GOARCH?=amd64
+export GOARCH
+CGO_ENABLED=1
+export CGO_ENABLED
+ifeq ($(GOARCH), arm64)
+export CC=aarch64-linux-gnu-gcc
+endif
 NAME=cni-ipvlan-vpc-k8s
 VERSION:=$(shell git describe --tags)
 DOCKER_IMAGE=lyft/cni-ipvlan-vpc-k8s:$(VERSION)
@@ -10,16 +17,12 @@ all: build test
 clean:
 	rm -f *.tar.gz $(NAME)-*
 
-.PHONY: cache
-cache:
-	go install ./
-
 .PHONY: lint
 lint:
 	golangci-lint run -D errcheck -D govet
 
 .PHONY: test
-test: cache
+test:
 ifndef GOOS
 	go test -v ./aws/... ./nl ./cmd/cni-ipvlan-vpc-k8s-tool ./lib/...
 else
@@ -27,13 +30,13 @@ else
 endif
 
 .PHONY: build
-build: cache
+build:
 	go build -i -o $(NAME)-ipam ./plugin/ipam/main.go
 	go build -i -o $(NAME)-ipvlan ./plugin/ipvlan/ipvlan.go
 	go build -i -o $(NAME)-unnumbered-ptp ./plugin/unnumbered-ptp/unnumbered-ptp.go
 	go build -i -ldflags "-X main.version=$(VERSION)" -o $(NAME)-tool ./cmd/cni-ipvlan-vpc-k8s-tool/cni-ipvlan-vpc-k8s-tool.go
 
-	tar cvzf cni-ipvlan-vpc-k8s-$(VERSION).tar.gz $(NAME)-ipam $(NAME)-ipvlan $(NAME)-unnumbered-ptp $(NAME)-tool
+	tar cvzf cni-ipvlan-vpc-k8s-${GOARCH}-$(VERSION).tar.gz $(NAME)-ipam $(NAME)-ipvlan $(NAME)-unnumbered-ptp $(NAME)-tool
 
 .PHONY: test-docker
 test-docker:
