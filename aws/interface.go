@@ -23,8 +23,8 @@ var (
 
 // InterfaceClient provides methods for allocating and deallocating interfaces
 type InterfaceClient interface {
-	NewInterfaceOnSubnetAtIndex(index int, secGrps []string, subnet Subnet) (*Interface, error)
-	NewInterface(secGrps []string, requiredTags map[string]string) (*Interface, error)
+	NewInterfaceOnSubnetAtIndex(index int, secGrps []string, subnet Subnet, ipBatchSize int64) (*Interface, error)
+	NewInterface(secGrps []string, requiredTags map[string]string, ipBatchSize int64) (*Interface, error)
 	RemoveInterface(interfaceIDs []string) error
 }
 
@@ -34,7 +34,7 @@ type interfaceClient struct {
 }
 
 // NewInterfaceOnSubnetAtIndex creates a new Interface with a specified subnet and index
-func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []string, subnet Subnet) (*Interface, error) {
+func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []string, subnet Subnet, ipBatchSize int64) (*Interface, error) {
 	client, err := c.aws.newEC2()
 	if err != nil {
 		return nil, err
@@ -55,6 +55,16 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 
 	createReq.SetGroups(secGrpsPtr)
 	createReq.SetSubnetId(subnet.ID)
+
+	// Subtract 1 to Account for primary IP
+	ipv4Limit := int64(c.aws.ENILimits().IPv4) - 1
+
+	// batch size 0 conventionally means "request the limit"
+	if ipBatchSize == 0 || ipBatchSize > ipv4Limit {
+		createReq.SecondaryPrivateIpAddressCount = &ipv4Limit
+	} else {
+		createReq.SecondaryPrivateIpAddressCount = &ipBatchSize
+	}
 
 	resp, err := client.CreateNetworkInterface(createReq)
 	if err != nil {
@@ -108,10 +118,12 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 		}
 		for _, intf := range newInterfaces {
 			if intf.Mac == *resp.NetworkInterface.MacAddress {
-				if privateIPAddr := net.ParseIP(*resp.NetworkInterface.PrivateIpAddress); privateIPAddr != nil {
-					// New IP. Timestamp the addition as a free IP.
-					registry := &Registry{}
-					registry.TrackIP(privateIPAddr)
+				registry := &Registry{}
+				// Timestamp the addition of all the new IPs in the registry.
+				for _, privateIPAddress := range resp.NetworkInterface.PrivateIpAddresses {
+					if privateIPAddr := net.ParseIP(*privateIPAddress.PrivateIpAddress); privateIPAddr != nil {
+						registry.TrackIP(privateIPAddr)
+					}
 				}
 				// Interfaces are sorted by device number. The first one is the main one
 				mainIf := newInterfaces[0].IfName
@@ -143,7 +155,7 @@ func configureInterface(intf *Interface, mainIf string) {
 }
 
 // NewInterface creates an Interface based on specified parameters
-func (c *interfaceClient) NewInterface(secGrps []string, requiredTags map[string]string) (*Interface, error) {
+func (c *interfaceClient) NewInterface(secGrps []string, requiredTags map[string]string, ipBatchSize int64) (*Interface, error) {
 	subnets, err := c.subnet.GetSubnetsForInstance()
 	if err != nil {
 		return nil, err
@@ -182,7 +194,7 @@ OUTER:
 		return nil, fmt.Errorf("No subnets are available which haven't already been used")
 	}
 
-	return c.NewInterfaceOnSubnetAtIndex(len(existingInterfaces), secGrps, availableSubnets[0])
+	return c.NewInterfaceOnSubnetAtIndex(len(existingInterfaces), secGrps, availableSubnets[0], ipBatchSize)
 }
 
 // RemoveInterface gracefull shutdown and removal of interfaces

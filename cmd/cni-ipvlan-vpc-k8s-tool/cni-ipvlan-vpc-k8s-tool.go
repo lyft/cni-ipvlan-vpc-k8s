@@ -48,6 +48,7 @@ func actionNewInterface(c *cli.Context) error {
 			fmt.Printf("Invalid filter specification %v", err)
 			return err
 		}
+		ipBatchSize := c.Int64("ip_batch_size")
 
 		secGrps := c.Args()
 
@@ -55,7 +56,7 @@ func actionNewInterface(c *cli.Context) error {
 			fmt.Println("please specify security groups")
 			return fmt.Errorf("need security groups")
 		}
-		newIf, err := aws.DefaultClient.NewInterface(secGrps, filters)
+		newIf, err := aws.DefaultClient.NewInterface(secGrps, filters, ipBatchSize)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -125,13 +126,16 @@ func actionDeallocate(c *cli.Context) error {
 func actionAllocate(c *cli.Context) error {
 	return lib.LockfileRun(func() error {
 		index := c.Int("index")
-		res, err := aws.DefaultClient.AllocateIPFirstAvailableAtIndex(index)
+		ipBatchSize := c.Int64("ip_batch_size")
+		res, err := aws.DefaultClient.AllocateIPsFirstAvailableAtIndex(index, ipBatchSize)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
+		for _, alloc := range res {
+			fmt.Printf("allocated %v on %v\n", alloc.IP, alloc.Interface.LocalName())
+		}
 
-		fmt.Printf("allocated %v on %v\n", res.IP, res.Interface.LocalName())
 		return nil
 
 	})
@@ -305,6 +309,8 @@ func actionRegistryList(c *cli.Context) error {
 func actionRegistryGc(c *cli.Context) error {
 	return lib.LockfileRun(func() error {
 
+		maxReap := c.Int("max-reap")
+
 		reg := &aws.Registry{}
 		freeAfter := c.Duration("free-after")
 		if freeAfter <= 0*time.Second {
@@ -343,8 +349,13 @@ func actionRegistryGc(c *cli.Context) error {
 			err := aws.DefaultClient.DeallocateIP(&ip)
 			if err == nil {
 				reg.ForgetIP(ip)
+				maxReap--
 			} else {
 				fmt.Fprintf(os.Stderr, "Can't deallocate %v due to %v", ip, err)
+			}
+			// max-reap specified as negative number will never reach 0 and reap all unused IPs
+			if maxReap == 0 {
+				return nil
 			}
 		}
 
@@ -375,6 +386,11 @@ func main() {
 					Name:  "subnet_filter",
 					Usage: "Comma separated key=value filters to restrict subnets",
 				},
+				cli.Int64Flag{
+					Name:  "ip_batch_size",
+					Usage: "Number of ips to allocate on the interface. Specify 0 to max out the interface.",
+					Value: 1,
+				},
 			},
 		},
 		{
@@ -394,7 +410,14 @@ func main() {
 			Usage:  "Allocate a private IP on the first available interface",
 			Action: actionAllocate,
 			Flags: []cli.Flag{
-				cli.IntFlag{Name: "index"},
+				cli.IntFlag{
+					Name: "index",
+				},
+				cli.Int64Flag{
+					Name:  "ip_batch_size",
+					Usage: "Number of ips to allocate on the interface. Specify 0 to max out the interface.",
+					Value: 1,
+				},
 			},
 		},
 		{
@@ -455,8 +478,15 @@ func main() {
 			Usage:  "Free all IPs that have remained unused for a given time interval",
 			Action: actionRegistryGc,
 			Flags: []cli.Flag{
-				cli.DurationFlag{Name: "free-after",
-					Value: 0 * time.Second},
+				cli.DurationFlag{
+					Name:  "free-after",
+					Value: 0 * time.Second,
+				},
+				cli.IntFlag{
+					Name:  "max-reap",
+					Value: -1,
+					Usage: "Max number of ips to reap on a single run. -1 reaps all unused IPs",
+				},
 			},
 		},
 	}

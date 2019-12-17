@@ -17,9 +17,9 @@ type AllocationResult struct {
 
 // AllocateClient offers IP allocation on interfaces
 type AllocateClient interface {
-	AllocateIPOn(intf Interface) (*AllocationResult, error)
-	AllocateIPFirstAvailableAtIndex(index int) (*AllocationResult, error)
-	AllocateIPFirstAvailable() (*AllocationResult, error)
+	AllocateIPsOn(intf Interface, batchSize int64) ([]*AllocationResult, error)
+	AllocateIPsFirstAvailableAtIndex(index int, batchSize int64) ([]*AllocationResult, error)
+	AllocateIPsFirstAvailable(batchSize int64) ([]*AllocationResult, error)
 	DeallocateIP(ipToRelease *net.IP) error
 }
 
@@ -28,8 +28,9 @@ type allocateClient struct {
 	subnet SubnetsClient
 }
 
-// AllocateIPOn allocates an IP on a specific interface.
-func (c *allocateClient) AllocateIPOn(intf Interface) (*AllocationResult, error) {
+// AllocateIPsOn allocates IPs on a specific interface.
+func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) ([]*AllocationResult, error) {
+	var allocationResults []*AllocationResult
 	client, err := c.aws.newEC2()
 	if err != nil {
 		return nil, err
@@ -37,7 +38,16 @@ func (c *allocateClient) AllocateIPOn(intf Interface) (*AllocationResult, error)
 	request := ec2.AssignPrivateIpAddressesInput{
 		NetworkInterfaceId: &intf.ID,
 	}
-	request.SetSecondaryPrivateIpAddressCount(1)
+
+	available := int64(c.aws.ENILimits().IPv4 - len(intf.IPv4s))
+
+	// If there are fewer IPs left than the batch size, request all the remaining IPs
+	// batch size 0 conventionally means "request the limit"
+	if batchSize == 0 || available < batchSize {
+		batchSize = available
+	}
+
+	request.SetSecondaryPrivateIpAddressCount(batchSize)
 
 	_, err = client.AssignPrivateIpAddresses(&request)
 	if err != nil {
@@ -66,12 +76,17 @@ func (c *allocateClient) AllocateIPOn(intf Interface) (*AllocationResult, error)
 					if exists, err := registry.HasIP(newip); err == nil && !exists {
 						// New IP. Timestamp the addition as a free IP.
 						registry.TrackIP(newip)
-						return &AllocationResult{
-							&newip,
+						ipcopy := newip // Need to copy
+						allocationResult := &AllocationResult{
+							&ipcopy,
 							newIntf,
-						}, nil
+						}
+						allocationResults = append(allocationResults, allocationResult)
 					}
 				}
+			}
+			if len(allocationResults) > 0 {
+				return allocationResults, nil
 			}
 		}
 		time.Sleep(1.0 * time.Second)
@@ -80,9 +95,9 @@ func (c *allocateClient) AllocateIPOn(intf Interface) (*AllocationResult, error)
 	return nil, fmt.Errorf("Can't locate new IP address from AWS")
 }
 
-// AllocateIPFirstAvailableAtIndex allocates an IP address, skipping any adapter < the given index
-// Returns a reference to the interface the IP was allocated on
-func (c *allocateClient) AllocateIPFirstAvailableAtIndex(index int) (*AllocationResult, error) {
+// AllocateIPsFirstAvailableAtIndex allocates IP addresses, skipping any adapter < the given index
+// Returns a reference to the interface the IPs were allocated on
+func (c *allocateClient) AllocateIPsFirstAvailableAtIndex(index int, batchSize int64) ([]*AllocationResult, error) {
 	interfaces, err := c.aws.GetInterfaces()
 	if err != nil {
 		return nil, err
@@ -111,7 +126,7 @@ func (c *allocateClient) AllocateIPFirstAvailableAtIndex(index int) (*Allocation
 		}
 		for _, intf := range candidates {
 			if intf.SubnetID == subnet.ID {
-				return c.AllocateIPOn(intf)
+				return c.AllocateIPsOn(intf, batchSize)
 			}
 		}
 	}
@@ -119,10 +134,10 @@ func (c *allocateClient) AllocateIPFirstAvailableAtIndex(index int) (*Allocation
 	return nil, fmt.Errorf("Unable to allocate - no IPs available on any interfaces")
 }
 
-// AllocateIPFirstAvailable allocates an IP address on the first available IP address
-// Returns a reference to the interface the IP was allocated on
-func (c *allocateClient) AllocateIPFirstAvailable() (*AllocationResult, error) {
-	return c.AllocateIPFirstAvailableAtIndex(0)
+// AllocateIPsFirstAvailable allocates IP addresses on the first available IP address
+// Returns a reference to the interface the IPs were allocated on
+func (c *allocateClient) AllocateIPsFirstAvailable(batchSize int64) ([]*AllocationResult, error) {
+	return c.AllocateIPsFirstAvailableAtIndex(0, batchSize)
 }
 
 // DeallocateIP releases an IP back to AWS

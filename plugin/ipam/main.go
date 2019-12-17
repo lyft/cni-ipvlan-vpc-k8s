@@ -46,6 +46,7 @@ type PluginConf struct {
 	SkipDeallocation bool              `json:"skipDeallocation"`
 	RouteToVPCPeers  bool              `json:"routeToVpcPeers"`
 	ReuseIPWait      int               `json:"reuseIPWait"`
+	IPBatchSize      int64             `json:"ipBatchSize"`
 }
 
 func init() {
@@ -106,18 +107,18 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	// No free IPs available for use, so let's allocate one
 	if alloc == nil {
-		// allocate an IP on an available interface
-		alloc, err = aws.DefaultClient.AllocateIPFirstAvailableAtIndex(conf.IfaceIndex)
-		if err != nil {
+		// allocate IPs on an available interface
+		allocs, err := aws.DefaultClient.AllocateIPsFirstAvailableAtIndex(conf.IfaceIndex, conf.IPBatchSize)
+		if err == nil {
+			alloc = allocs[0]
+		} else {
 			// failed, so attempt to add an IP to a new interface
-			newIf, err := aws.DefaultClient.NewInterface(conf.SecGroupIds, conf.SubnetTags)
-			// If this interface has somehow gained more than one IP since being allocated,
-			// abort this process and let a subsequent run find a valid IP.
-			if err != nil || len(newIf.IPv4s) != 1 {
+			newIf, err := aws.DefaultClient.NewInterface(conf.SecGroupIds, conf.SubnetTags, conf.IPBatchSize)
+			if err != nil || len(newIf.IPv4s) < 1 {
 				return fmt.Errorf("unable to create a new elastic network interface due to %v",
 					err)
 			}
-			// Freshly allocated interfaces will always have one valid IP - use
+			// Freshly allocated interfaces will always have at least one valid IP - use
 			// this IP address.
 			alloc = &aws.AllocationResult{
 				&newIf.IPv4s[0],
