@@ -173,6 +173,7 @@ true.
         "ec2:DetachNetworkInterface"
         "ec2:DeleteNetworkInterface"
         "ec2:ModifyNetworkInterfaceAttribute"
+        "ec2:DescribeInstanceTypes"
         "ec2:DescribeVpcs"
         "ec2:DescribeVpcPeeringConnections"
 

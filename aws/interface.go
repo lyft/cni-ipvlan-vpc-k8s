@@ -167,7 +167,7 @@ func (c *interfaceClient) NewInterface(secGrps []string, requiredTags map[string
 	}
 
 	limits := c.aws.ENILimits()
-	if len(existingInterfaces) >= limits.Adapters {
+	if int64(len(existingInterfaces)) >= limits.Adapters {
 		return nil, fmt.Errorf("too many adapters on this instance already")
 	}
 

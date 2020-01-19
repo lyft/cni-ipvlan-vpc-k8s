@@ -171,7 +171,7 @@ func actionLimits(c *cli.Context) error {
 
 func actionMaxPods(c *cli.Context) error {
 	limit := aws.DefaultClient.ENILimits()
-	specifiedMax := c.Int("max")
+	specifiedMax := int64(c.Int("max"))
 	max := (limit.Adapters - 1) * limit.IPv4
 	if specifiedMax > 0 && specifiedMax < max {
 		// Limit the maximum to the CLI maximum
