@@ -28,10 +28,10 @@ func TestLimitsReturn(t *testing.T) {
 	cases := []struct {
 		iType    string
 		Resp     ec2.DescribeInstanceTypesOutput
-		Expected ENILimit
+		Expected *ENILimit
 	}{
 		{
-			Expected: ENILimit{
+			Expected: &ENILimit{
 				Adapters: 4,
 				IPv4:     15,
 				IPv6:     15,
@@ -50,7 +50,7 @@ func TestLimitsReturn(t *testing.T) {
 			},
 		},
 		{
-			Expected: ENILimit{
+			Expected: &ENILimit{
 				Adapters: 15,
 				IPv4:     50,
 				IPv6:     50,
@@ -81,14 +81,14 @@ func TestLimitsReturn(t *testing.T) {
 		}
 		defaultClient.ec2Client = mock
 
-		res := defaultClient.ENILimits()
+		res, _ := defaultClient.ENILimits()
 		if !reflect.DeepEqual(res, c.Expected) {
 			t.Fatalf("ENILimits do not match. Expected: %v Got: %v", c.Expected, res)
 		}
 
 		calls := mock.InstanceTypesDescribeCalls
 
-		res = defaultClient.ENILimits()
+		res, _ = defaultClient.ENILimits()
 		if mock.InstanceTypesDescribeCalls != calls {
 			t.Fatalf("Caching logic failed, API call made")
 		}

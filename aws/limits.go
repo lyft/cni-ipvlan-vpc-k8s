@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/lyft/cni-ipvlan-vpc-k8s/aws/cache"
+	"github.com/pkg/errors"
 )
 
 // ENILimit contains limits for adapter count and addresses
@@ -18,14 +19,14 @@ type ENILimit struct {
 
 // LimitsClient provides methods for locating limits in AWS
 type LimitsClient interface {
-	ENILimits() ENILimit
+	ENILimits() (*ENILimit, error)
 }
 
 // ENILimitsForInstanceType returns the limits for ENI for an instance type
-func (c *awsclient) ENILimitsForInstanceType(itype string) (ENILimit, error) {
+func (c *awsclient) ENILimitsForInstanceType(itype string) (*ENILimit, error) {
 	client, err := c.newEC2()
 	if err != nil {
-		return ENILimit{}, err
+		return nil, err
 	}
 
 	itypeList := []string{itype}
@@ -35,14 +36,14 @@ func (c *awsclient) ENILimitsForInstanceType(itype string) (ENILimit, error) {
 
 	instanceDescribeOutput, err := client.DescribeInstanceTypes(describeInstanceTypesInput)
 	if err != nil {
-		return ENILimit{}, err
+		return nil, err
 	}
 	if len(instanceDescribeOutput.InstanceTypes) == 0 {
-		return ENILimit{}, fmt.Errorf("empty answer from DescribeInstanceTypes for %s", itype)
+		return nil, fmt.Errorf("empty answer from DescribeInstanceTypes for %s", itype)
 	}
 
 	netInfo := instanceDescribeOutput.InstanceTypes[0].NetworkInfo
-	limit := ENILimit{
+	limit := &ENILimit{
 		Adapters: *netInfo.MaximumNetworkInterfaces,
 		IPv4:     *netInfo.Ipv4AddressesPerInterface,
 		IPv6:     *netInfo.Ipv6AddressesPerInterface,
@@ -51,25 +52,25 @@ func (c *awsclient) ENILimitsForInstanceType(itype string) (ENILimit, error) {
 }
 
 // ENILimits returns the limits based on the system's instance type
-func (c *awsclient) ENILimits() ENILimit {
+func (c *awsclient) ENILimits() (*ENILimit, error) {
 	id, err := c.getIDDoc()
 	if err != nil || id == nil {
-		return ENILimit{}
+		return nil, errors.Wrap(err, "unable get instance identity doc")
 	}
 
 	// Use the instance type in the cache key in case at some point the cache dir is persisted across reboots
 	// (instances can be stopped and resized)
 	key := "eni_limits_for_" + id.InstanceType
-	limit := ENILimit{}
-	if cache.Get(key, &limit) == cache.CacheFound {
-		return limit
+	limit := &ENILimit{}
+	if cache.Get(key, limit) == cache.CacheFound {
+		return limit, nil
 	}
 
 	limit, err = c.ENILimitsForInstanceType(id.InstanceType)
 	if err != nil {
-		return ENILimit{}
+		return nil, errors.Wrap(err, "unable get instance network limits")
 	}
 
 	cache.Store(key, 24*time.Hour, limit)
-	return limit
+	return limit, nil
 }

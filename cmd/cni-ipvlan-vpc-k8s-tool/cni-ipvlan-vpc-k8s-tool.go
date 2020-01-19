@@ -159,7 +159,10 @@ func actionFreeIps(c *cli.Context) error {
 }
 
 func actionLimits(c *cli.Context) error {
-	limit := aws.DefaultClient.ENILimits()
+	limit, err := aws.DefaultClient.ENILimits()
+	if err != nil {
+		return err
+	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 	fmt.Fprintln(w, "adapters\tipv4\tipv6\t")
 	fmt.Fprintf(w, "%v\t%v\t%v\t\n", limit.Adapters,
@@ -170,7 +173,10 @@ func actionLimits(c *cli.Context) error {
 }
 
 func actionMaxPods(c *cli.Context) error {
-	limit := aws.DefaultClient.ENILimits()
+	limit, err := aws.DefaultClient.ENILimits()
+	if err != nil {
+		return err
+	}
 	specifiedMax := int64(c.Int("max"))
 	max := (limit.Adapters - 1) * limit.IPv4
 	if specifiedMax > 0 && specifiedMax < max {
