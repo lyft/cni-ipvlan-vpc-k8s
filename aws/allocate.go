@@ -39,7 +39,11 @@ func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) ([]*Allo
 		NetworkInterfaceId: &intf.ID,
 	}
 
-	available := int64(c.aws.ENILimits().IPv4 - len(intf.IPv4s))
+	limits, err := c.aws.ENILimits()
+	if err != nil {
+		return nil, err
+	}
+	available := limits.IPv4 - int64(len(intf.IPv4s))
 
 	// If there are fewer IPs left than the batch size, request all the remaining IPs
 	// batch size 0 conventionally means "request the limit"
@@ -102,14 +106,17 @@ func (c *allocateClient) AllocateIPsFirstAvailableAtIndex(index int, batchSize i
 	if err != nil {
 		return nil, err
 	}
-	limits := c.aws.ENILimits()
+	limits, err := c.aws.ENILimits()
+	if err != nil {
+		return nil, err
+	}
 
 	var candidates []Interface
 	for _, intf := range interfaces {
 		if intf.Number < index {
 			continue
 		}
-		if len(intf.IPv4s) < limits.IPv4 {
+		if int64(len(intf.IPv4s)) < limits.IPv4 {
 			candidates = append(candidates, intf)
 		}
 	}

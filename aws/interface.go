@@ -57,7 +57,11 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 	createReq.SetSubnetId(subnet.ID)
 
 	// Subtract 1 to Account for primary IP
-	ipv4Limit := int64(c.aws.ENILimits().IPv4) - 1
+	limits, err := c.aws.ENILimits()
+	if err != nil {
+		return nil, err
+	}
+	ipv4Limit := limits.IPv4 - 1
 
 	// batch size 0 conventionally means "request the limit"
 	if ipBatchSize == 0 || ipBatchSize > ipv4Limit {
@@ -166,8 +170,11 @@ func (c *interfaceClient) NewInterface(secGrps []string, requiredTags map[string
 		return nil, err
 	}
 
-	limits := c.aws.ENILimits()
-	if len(existingInterfaces) >= limits.Adapters {
+	limits, err := c.aws.ENILimits()
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(existingInterfaces)) >= limits.Adapters {
 		return nil, fmt.Errorf("too many adapters on this instance already")
 	}
 

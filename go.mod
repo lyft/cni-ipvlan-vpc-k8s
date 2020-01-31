@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/Microsoft/go-winio v0.4.11
 	github.com/alecthomas/units v0.0.0-20190910110746-680d30ca3117 // indirect
-	github.com/aws/aws-sdk-go v1.12.79
+	github.com/aws/aws-sdk-go v1.28.1
 	github.com/containernetworking/cni v0.6.0
 	github.com/containernetworking/plugins v0.7.4
 	github.com/coreos/go-iptables v0.4.0
@@ -17,7 +17,7 @@ require (
 	github.com/golangci/golangci-lint v1.18.0 // indirect
 	github.com/google/shlex v0.0.0-20181106134648-c34317bd91bf // indirect
 	github.com/j-keck/arping v0.0.0-20160618110441-2cf9dc699c56
-	github.com/jmespath/go-jmespath v0.0.0-20160202185014-0b12d6b521d8
+	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 	github.com/nightlyone/lockfile v0.0.0-20180618180623-0ad87eef1443
 	github.com/pkg/errors v0.8.1
 	github.com/urfave/cli v1.20.0
