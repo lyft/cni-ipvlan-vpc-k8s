@@ -61,12 +61,15 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 	if err != nil {
 		return nil, err
 	}
-	ipv4Limit := limits.IPv4 - 1
 
 	// batch size 0 conventionally means "request the limit"
-	if ipBatchSize == 0 || ipBatchSize > ipv4Limit {
-		createReq.SecondaryPrivateIpAddressCount = &ipv4Limit
-	} else {
+	if ipBatchSize == 0 || ipBatchSize > limits.IPv4 {
+		ipBatchSize = limits.IPv4
+	}
+
+	// We will already get a primary IP on the ENI
+	ipBatchSize = ipBatchSize - 1
+	if ipBatchSize > 0 {
 		createReq.SecondaryPrivateIpAddressCount = &ipBatchSize
 	}
 
