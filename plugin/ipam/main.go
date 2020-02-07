@@ -60,6 +60,7 @@ func init() {
 func parseConfig(stdin []byte) (*PluginConf, error) {
 	conf := PluginConf{
 		ReuseIPWait: 60, // default 60 second wait
+		IPBatchSize: 1,  // default 1 (backward compatibility)
 	}
 
 	if err := json.Unmarshal(stdin, &conf); err != nil {
