@@ -240,7 +240,7 @@ not a dependency of this software.
 	    "cniVersion": "0.3.1",
 	    "type": "cni-ipvlan-vpc-k8s-unnumbered-ptp",
 	    "hostInterface": "eth0",
-	    "containerInterface": "veth0",
+	    "containerInterface": "eth1",
 	    "ipMasq": true
 	}
     ]
