@@ -2,6 +2,7 @@ package aws
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"sort"
 	"time"
@@ -41,7 +42,7 @@ func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) ([]*Allo
 
 	limits, err := c.aws.ENILimits()
 	if err != nil {
-		return nil, err
+		log.Printf("unable to determine AWS limits, using fallback %v", err)
 	}
 	available := limits.IPv4 - int64(len(intf.IPv4s))
 
@@ -108,7 +109,7 @@ func (c *allocateClient) AllocateIPsFirstAvailableAtIndex(index int, batchSize i
 	}
 	limits, err := c.aws.ENILimits()
 	if err != nil {
-		return nil, err
+		log.Printf("unable to determine AWS limits, using fallback %v", err)
 	}
 
 	var candidates []Interface

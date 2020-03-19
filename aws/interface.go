@@ -2,6 +2,7 @@ package aws
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"sort"
@@ -59,7 +60,7 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 	// Subtract 1 to Account for primary IP
 	limits, err := c.aws.ENILimits()
 	if err != nil {
-		return nil, err
+		log.Printf("unable to determine AWS limits, using fallback %v", err)
 	}
 
 	// batch size 0 conventionally means "request the limit"
@@ -175,7 +176,7 @@ func (c *interfaceClient) NewInterface(secGrps []string, requiredTags map[string
 
 	limits, err := c.aws.ENILimits()
 	if err != nil {
-		return nil, err
+		log.Printf("unable to determine AWS limits, using fallback %v", err)
 	}
 	if int64(len(existingInterfaces)) >= limits.Adapters {
 		return nil, fmt.Errorf("too many adapters on this instance already")
