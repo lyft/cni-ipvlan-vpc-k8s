@@ -22,6 +22,12 @@ type LimitsClient interface {
 	ENILimits() (*ENILimit, error)
 }
 
+var defaultLimit = ENILimit{
+	Adapters: 4,
+	IPv4:     15,
+	IPv6:     15,
+}
+
 // ENILimitsForInstanceType returns the limits for ENI for an instance type
 func (c *awsclient) ENILimitsForInstanceType(itype string) (*ENILimit, error) {
 	client, err := c.newEC2()
@@ -55,7 +61,7 @@ func (c *awsclient) ENILimitsForInstanceType(itype string) (*ENILimit, error) {
 func (c *awsclient) ENILimits() (*ENILimit, error) {
 	id, err := c.getIDDoc()
 	if err != nil || id == nil {
-		return nil, errors.Wrap(err, "unable get instance identity doc")
+		return &defaultLimit, errors.Wrap(err, "unable get instance identity doc")
 	}
 
 	// Use the instance type in the cache key in case at some point the cache dir is persisted across reboots
@@ -68,7 +74,7 @@ func (c *awsclient) ENILimits() (*ENILimit, error) {
 
 	limit, err = c.ENILimitsForInstanceType(id.InstanceType)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable get instance network limits")
+		return &defaultLimit, errors.Wrap(err, "unable get instance network limits")
 	}
 
 	cache.Store(key, 24*time.Hour, limit)

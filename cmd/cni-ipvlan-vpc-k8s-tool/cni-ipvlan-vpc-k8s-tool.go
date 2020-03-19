@@ -174,8 +174,14 @@ func actionLimits(c *cli.Context) error {
 
 func actionMaxPods(c *cli.Context) error {
 	limit, err := aws.DefaultClient.ENILimits()
+	retErr := c.Bool("return-error")
 	if err != nil {
-		return err
+		if retErr {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "unable to determine ENI limit due to '%v', defaulting max pods to 110", err)
+		fmt.Printf("%d\n", 110)
+		return nil
 	}
 	specifiedMax := int64(c.Int("max"))
 	max := (limit.Adapters - 1) * limit.IPv4
