@@ -230,9 +230,15 @@ func cmdDel(args *skel.CmdArgs) error {
 	return nil
 }
 
+// cmdCheck is called for CHECK requests
+func cmdCheck(args *skel.CmdArgs) error {
+	// TODO: implement this
+	return nil
+}
+
 func main() {
 	run := func() error {
-		skel.PluginMain(cmdAdd, cmdDel, version.PluginSupports(version.Current()))
+		skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.PluginSupports(version.Current()), "ipam")
 		return nil
 	}
 	_ = lib.LockfileRun(run)

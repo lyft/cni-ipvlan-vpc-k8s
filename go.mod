@@ -6,9 +6,9 @@ require (
 	github.com/Microsoft/go-winio v0.4.11
 	github.com/alecthomas/units v0.0.0-20190910110746-680d30ca3117 // indirect
 	github.com/aws/aws-sdk-go v1.29.27
-	github.com/containernetworking/cni v0.6.0
-	github.com/containernetworking/plugins v0.7.4
-	github.com/coreos/go-iptables v0.4.0
+	github.com/containernetworking/cni v0.7.1
+	github.com/containernetworking/plugins v0.8.5
+	github.com/coreos/go-iptables v0.4.5
 	github.com/docker/distribution v2.6.2+incompatible
 	github.com/docker/docker v1.13.1
 	github.com/docker/go-connections v0.4.0
@@ -24,7 +24,7 @@ require (
 	github.com/vishvananda/netlink v1.0.0
 	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc
 	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
-	golang.org/x/sys v0.0.0-20190312061237-fead79001313
+	golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
 	gopkg.in/alecthomas/gometalinter.v2 v2.0.12 // indirect
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20180810215634-df19058c872c // indirect
 )

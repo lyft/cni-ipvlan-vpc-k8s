@@ -255,6 +255,12 @@ func cmdDel(args *skel.CmdArgs) error {
 	return err
 }
 
+// cmdCheck is called for CHECK requests
+func cmdCheck(args *skel.CmdArgs) error {
+	// TODO: implement this
+	return nil
+}
+
 func main() {
-	skel.PluginMain(cmdAdd, cmdDel, version.All)
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "ipvlan")
 }
