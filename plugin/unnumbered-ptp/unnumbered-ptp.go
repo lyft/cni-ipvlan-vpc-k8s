@@ -23,7 +23,6 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"runtime"
 	"sort"
 	"strconv"
 	"time"
@@ -50,13 +49,6 @@ const (
 	podRulePriority      = 1024
 	nodePortRulePriority = 512
 )
-
-func init() {
-	// this ensures that main runs only on main thread (thread group leader).
-	// since namespace ops (unshare, setns) are done for a single thread, we
-	// must ensure that the goroutine does not jump from OS thread to thread
-	runtime.LockOSThread()
-}
 
 // PluginConf is whatever you expect your configuration json to be. This is whatever
 // is passed in on stdin. Your plugin may wish to expose its functionality via
@@ -518,12 +510,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 		chain := utils.FormatChainName(conf.Name, args.ContainerID)
 		comment := utils.FormatComment(conf.Name, args.ContainerID)
 		for _, ipc := range containerIPs {
-			addrBits := 128
-			if ipc.To4() != nil {
-				addrBits = 32
-			}
-
-			if err = ip.SetupIPMasq(&net.IPNet{IP: ipc, Mask: net.CIDRMask(addrBits, addrBits)}, chain, comment); err != nil {
+			// always assuming ipv4
+			if err = ip.SetupIPMasq(&net.IPNet{IP: ipc, Mask: net.CIDRMask(32, 32)}, chain, comment); err != nil {
 				return err
 			}
 		}
@@ -537,11 +525,22 @@ func cmdAdd(args *skel.CmdArgs) error {
 	return types.PrintResult(conf.PrevResult, conf.CNIVersion)
 }
 
+// cmdCheck is called for CHECK requests
+func cmdCheck(args *skel.CmdArgs) error {
+	// TODO: implement this
+	return nil
+}
+
 // cmdDel is called for DELETE requests
 func cmdDel(args *skel.CmdArgs) error {
 	conf, err := parseConfig(args.StdinData)
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't parse config: %w", err)
+	}
+
+	if !conf.IPMasq {
+		// we don't have to do anything if IPMasq is false.
+		return nil
 	}
 
 	if args.Netns == "" {
@@ -551,58 +550,57 @@ func cmdDel(args *skel.CmdArgs) error {
 	// There is a netns so try to clean up. Delete can be called multiple times
 	// so don't return an error if the device is already removed.
 	// If the device isn't there then don't try to clean up IP masq either.
-	var ipnets []netlink.Addr
-	vethPeerIndex := -1
-	_ = ns.WithNetNSPath(args.Netns, func(_ ns.NetNS) error {
+	var (
+		addrs         []netlink.Addr
+		vethPeerIndex int = -1
+	)
+	err = ns.WithNetNSPath(args.Netns, func(_ ns.NetNS) error {
 		var err error
-
-		// lookup pod IPs from the args.IfName device (usually eth0)
-		if conf.IPMasq {
-			iface, err := netlink.LinkByName(args.IfName)
-			if err != nil {
-				if err.Error() == "Link not found" {
-					return ip.ErrLinkNotFound
-				}
-				return fmt.Errorf("failed to lookup %q: %v", args.IfName, err)
-			}
-
-			ipnets, err = netlink.AddrList(iface, netlink.FAMILY_ALL)
-			if err != nil || len(ipnets) == 0 {
-				return fmt.Errorf("failed to get IP addresses for %q: %v", args.IfName, err)
-			}
+		// use the container interface (veth0) to find the peer index,
+		// so we can find this link outside of the namespace.
+		_, vethPeerIndex, err = ip.GetVethPeerIfindex(conf.ContainerInterface)
+		if err != nil {
+			return fmt.Errorf("failed to lookup %q: %v", conf.ContainerInterface, err)
 		}
 
-		vethIface, err := netlink.LinkByName(conf.ContainerInterface)
-		if err != nil && err != ip.ErrLinkNotFound {
-			return err
+		// now we grab the iface to get the proper container addrs
+		iface, err := netlink.LinkByName(args.IfName)
+		if err != nil {
+			return fmt.Errorf("couldn't load link by name %s: %w", args.IfName, err)
 		}
-		vethPeerIndex, _ = netlink.VethPeerIndex(&netlink.Veth{LinkAttrs: *vethIface.Attrs()})
-		return nil
+		// only care about errors in ipv4 space
+		addrs, err = netlink.AddrList(iface, netlink.FAMILY_V4)
+		if err != nil || len(addrs) == 0 {
+			return fmt.Errorf("couldn't discover addrs from iface: %s: %w", args.IfName, err)
+		}
+		return err
 	})
+	if err != nil {
+		return fmt.Errorf("couldn't discover peer idx from netns %s: %w", args.Netns, err)
+	}
 
-	if conf.IPMasq {
-		chain := utils.FormatChainName(conf.Name, args.ContainerID)
-		comment := utils.FormatComment(conf.Name, args.ContainerID)
-		for _, ipn := range ipnets {
-			addrBits := 128
-			if ipn.IP.To4() != nil {
-				addrBits = 32
-			}
-
-			_ = ip.TeardownIPMasq(&net.IPNet{IP: ipn.IP, Mask: net.CIDRMask(addrBits, addrBits)}, chain, comment)
+	chain := utils.FormatChainName(conf.Name, args.ContainerID)
+	comment := utils.FormatComment(conf.Name, args.ContainerID)
+	for _, ipn := range addrs {
+		// always assume ipv4, since those are the IPs we filter for
+		if err := ip.TeardownIPMasq(&net.IPNet{IP: ipn.IP, Mask: net.CIDRMask(32, 32)}, chain, comment); err != nil {
+			return fmt.Errorf("couldn't teardown ip masq: %w", err)
 		}
+	}
 
-		if vethPeerIndex != -1 {
-			link, err := netlink.LinkByIndex(vethPeerIndex)
-			if err != nil {
-				return nil
-			}
+	if vethPeerIndex != -1 {
+		link, err := netlink.LinkByIndex(vethPeerIndex)
+		if err != nil {
+			return fmt.Errorf("couldn't find link by index %d: %w", vethPeerIndex, err)
+		}
+		rule := netlink.NewRule()
+		rule.IifName = link.Attrs().Name
 
-			rule := netlink.NewRule()
-			rule.IifName = link.Attrs().Name
-			// ignore errors as we might be called multiple times
-			_ = netlink.RuleDel(rule)
-			_ = netlink.LinkDel(link)
+		if err := netlink.RuleDel(rule); err != nil {
+			return fmt.Errorf("couldn't delete rule %s: %w", rule.IifName, err)
+		}
+		if err := netlink.LinkDel(link); err != nil {
+			return fmt.Errorf("couldn't delete link %s: %w", link.Attrs().Name, err)
 		}
 	}
 
@@ -611,5 +609,5 @@ func cmdDel(args *skel.CmdArgs) error {
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	skel.PluginMain(cmdAdd, cmdDel, version.All)
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "unnumbered-ptp")
 }
