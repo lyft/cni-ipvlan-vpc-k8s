@@ -130,7 +130,7 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 				// Timestamp the addition of all the new IPs in the registry.
 				for _, privateIPAddress := range resp.NetworkInterface.PrivateIpAddresses {
 					if privateIPAddr := net.ParseIP(*privateIPAddress.PrivateIpAddress); privateIPAddr != nil {
-						registry.TrackIP(privateIPAddr)
+						registry.TrackIPAtEpoch(privateIPAddr)
 					}
 				}
 				// Interfaces are sorted by device number. The first one is the main one

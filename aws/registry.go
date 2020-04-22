@@ -142,6 +142,21 @@ func (r *Registry) save(rc *registryContents) error {
 	return err
 }
 
+// TrackIPAtEpoch sets the IP recorded time as the epoch (0 time)
+// so it appears as immediately free and avoids re-allocation
+func (r *Registry) TrackIPAtEpoch(ip net.IP) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	contents, err := r.load()
+	if err != nil {
+		return err
+	}
+
+	contents.IPs[ip.String()] = &registryIP{lib.JSONTime{time.Time{}}}
+	return r.save(contents)
+}
+
 // TrackIP records an IP in the free registry with the current system
 // time as the current freed-time. If an IP is freed again, the time
 // will be updated to the new current time.
