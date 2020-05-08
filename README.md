@@ -216,11 +216,11 @@ not a dependency of this software.
 
 ```
 {
-    "cniVersion": "0.3.1",
+    "cniVersion": "0.4.0",
     "name": "cni-ipvlan-vpc-k8s",
     "plugins": [
 	{
-	    "cniVersion": "0.3.1",
+	    "cniVersion": "0.4.0",
 	    "type": "cni-ipvlan-vpc-k8s-ipam",
 	    "interfaceIndex": 1,
 	    "subnetTags": {
@@ -232,12 +232,12 @@ not a dependency of this software.
 	    ]
 	},
 	{
-	    "cniVersion": "0.3.1",
+	    "cniVersion": "0.4.0",
 	    "type": "cni-ipvlan-vpc-k8s-ipvlan",
 	    "mode": "l2"
 	},
 	{
-	    "cniVersion": "0.3.1",
+	    "cniVersion": "0.4.0",
 	    "type": "cni-ipvlan-vpc-k8s-unnumbered-ptp",
 	    "hostInterface": "eth0",
 	    "containerInterface": "eth1",
