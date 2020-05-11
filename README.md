@@ -138,7 +138,7 @@ true.
 
 ## Prerequisites
 
-1. Kuberentes `1.16.0+`
+1. Kubernetes `1.16.0+`
 1. By default, we use a secondary (and tertiary, ...) ENI adapter for
    all Pod networking. This allows isolation by security groups or
    other constraints on the Kubelet control plane. This requires that
