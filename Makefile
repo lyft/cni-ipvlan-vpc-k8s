@@ -1,10 +1,5 @@
-GOARCH?=amd64
-export GOARCH
 CGO_ENABLED=1
 export CGO_ENABLED
-ifeq ($(GOARCH), arm64)
-export CC=aarch64-linux-gnu-gcc
-endif
 NAME=cni-ipvlan-vpc-k8s
 VERSION:=$(shell git describe --tags)
 DOCKER_IMAGE=lyft/cni-ipvlan-vpc-k8s:$(VERSION)
