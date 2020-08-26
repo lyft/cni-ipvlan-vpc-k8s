@@ -79,14 +79,18 @@ func (c *allocateClient) AllocateIPsOn(intf Interface, batchSize int64) ([]*Allo
 				if !found {
 					// only return IPs that haven't been previously registered
 					if exists, err := registry.HasIP(newip); err == nil && !exists {
-						// New IP. Timestamp the addition as a free IP.
-						registry.TrackIP(newip)
 						ipcopy := newip // Need to copy
 						allocationResult := &AllocationResult{
 							&ipcopy,
 							newIntf,
 						}
 						allocationResults = append(allocationResults, allocationResult)
+
+						// New IP. Timestamp the addition as a free IP.
+						err = registry.TrackIP(newip)
+						if err != nil {
+							return allocationResults, fmt.Errorf("failed to track ip: %s", err)
+						}
 					}
 				}
 			}

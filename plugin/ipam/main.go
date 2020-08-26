@@ -89,7 +89,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	// conf.ReuseIPWait seconds old in the registry to be
 	// considered for use.
 	free, err := aws.FindFreeIPsAtIndex(conf.IfaceIndex, true)
-	if err == nil && len(free) > 0 {
+	if err == nil || len(free) > 0 {
 		registryFreeIPs, err := registry.TrackedBefore(time.Now().Add(time.Duration(-conf.ReuseIPWait) * time.Second))
 		if err == nil && len(registryFreeIPs) > 0 {
 		loop:
@@ -98,7 +98,10 @@ func cmdAdd(args *skel.CmdArgs) error {
 					if freeAlloc.IP.Equal(freeRegistry) {
 						alloc = freeAlloc
 						// update timestamp
-						registry.TrackIP(freeRegistry)
+						err := registry.TrackIP(freeRegistry)
+						if err != nil {
+							return fmt.Errorf("failed to track ip: %s", err)
+						}
 						break loop
 					}
 				}
@@ -110,7 +113,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if alloc == nil {
 		// allocate IPs on an available interface
 		allocs, err := aws.DefaultClient.AllocateIPsFirstAvailableAtIndex(conf.IfaceIndex, conf.IPBatchSize)
-		if err == nil {
+		if err == nil || len(allocs) > 0 {
 			alloc = allocs[0]
 		} else {
 			// failed, so attempt to add an IP to a new interface
@@ -122,8 +125,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 			// Freshly allocated interfaces will always have at least one valid IP - use
 			// this IP address.
 			alloc = &aws.AllocationResult{
-				&newIf.IPv4s[0],
-				*newIf,
+				IP:        &newIf.IPv4s[0],
+				Interface: *newIf,
 			}
 		}
 	}
@@ -132,9 +135,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 	// subnet + 1 is our gateway
 	// primary cidr + 2 is the dns server
 	subnetAddr := alloc.Interface.SubnetCidr.IP.To4()
-	gw := net.IP(append(subnetAddr[:3], subnetAddr[3]+1))
+	gw := append(subnetAddr[:3], subnetAddr[3]+1)
 	vpcPrimaryAddr := alloc.Interface.VpcPrimaryCidr.IP.To4()
-	dns := net.IP(append(vpcPrimaryAddr[:3], vpcPrimaryAddr[3]+2))
+	dns := append(vpcPrimaryAddr[:3], vpcPrimaryAddr[3]+2)
 	addr := net.IPNet{
 		IP:   *alloc.IP,
 		Mask: alloc.Interface.SubnetCidr.Mask,
@@ -185,11 +188,14 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	// add routes for all VPC cidrs via the subnet gateway
 	for _, dst := range cidrs {
-		result.Routes = append(result.Routes, &types.Route{*dst, gw})
+		result.Routes = append(result.Routes, &types.Route{Dst: *dst, GW: gw})
 	}
 
 	// remove the IP from the registry just before handing off to ipvlan
-	registry.ForgetIP(*alloc.IP)
+	err = registry.ForgetIP(*alloc.IP)
+	if err != nil {
+		return fmt.Errorf("failed to forget ip: %s", err)
+	}
 
 	return types.PrintResult(result, conf.CNIVersion)
 }
@@ -214,17 +220,20 @@ func cmdDel(args *skel.CmdArgs) error {
 		return err
 	})
 
-	if !conf.SkipDeallocation {
-		// deallocate IPs outside of the namespace so creds are correct
-		for _, addr := range addrs {
-			aws.DefaultClient.DeallocateIP(&addr.IP)
-		}
-	}
-
-	// Mark this IP as free in the registry
 	registry := &aws.Registry{}
 	for _, addr := range addrs {
-		registry.TrackIP(addr.IP)
+		if !conf.SkipDeallocation {
+			// deallocate IPs outside of the namespace so creds are correct
+			err := aws.DefaultClient.DeallocateIP(&addr.IP)
+			if err != nil {
+				return fmt.Errorf("failed to deallocate ip: %s", err)
+			}
+		}
+		// Mark this IP as free in the registry
+		err := registry.TrackIP(addr.IP)
+		if err != nil {
+			return fmt.Errorf("failed to track ip: %s", err)
+		}
 	}
 
 	return nil

@@ -130,7 +130,7 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 				// Timestamp the addition of all the new IPs in the registry.
 				for _, privateIPAddress := range resp.NetworkInterface.PrivateIpAddresses {
 					if privateIPAddr := net.ParseIP(*privateIPAddress.PrivateIpAddress); privateIPAddr != nil {
-						registry.TrackIPAtEpoch(privateIPAddr)
+						_ = registry.TrackIPAtEpoch(privateIPAddr)
 					}
 				}
 				// Interfaces are sorted by device number. The first one is the main one
@@ -159,7 +159,10 @@ func configureInterface(intf *Interface, mainIf string) {
 	if err != nil || baseMtu < 1000 || baseMtu > 9001 {
 		return
 	}
-	nl.SetMtu(intf.LocalName(), baseMtu)
+	err = nl.SetMtu(intf.LocalName(), baseMtu)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to configure mtu: %s", err)
+	}
 }
 
 // NewInterface creates an Interface based on specified parameters
@@ -208,7 +211,7 @@ OUTER:
 	return c.NewInterfaceOnSubnetAtIndex(len(existingInterfaces), secGrps, availableSubnets[0], ipBatchSize)
 }
 
-// RemoveInterface gracefull shutdown and removal of interfaces
+// RemoveInterface graceful shutdown and removal of interfaces
 // Simply detach the interface, wait for it to come down and then
 // removes.
 func (c *awsclient) RemoveInterface(interfaceIDs []string) error {

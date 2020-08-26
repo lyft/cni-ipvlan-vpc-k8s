@@ -275,7 +275,7 @@ func setupNodePortRule(ifName string, nodePorts string, nodePortMark int) error 
 	exists := false
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
-		return fmt.Errorf("Unable to retrive IP rules %v", err)
+		return fmt.Errorf("Unable to retrieve IP rules %v", err)
 	}
 
 	for _, r := range rules {

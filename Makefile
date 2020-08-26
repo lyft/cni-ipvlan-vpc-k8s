@@ -14,7 +14,7 @@ clean:
 
 .PHONY: lint
 lint:
-	golangci-lint run -D errcheck -D govet
+	golangci-lint run ./...
 
 .PHONY: test
 test:
