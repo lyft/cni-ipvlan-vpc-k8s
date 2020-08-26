@@ -41,7 +41,7 @@ func cachePath() string {
 // Cacheable defines metadata for objects which can be cached to files as JSON
 type Cacheable struct {
 	Expires  lib.JSONTime `json:"_expires"`
-	Contents interface{}  `json":contents"`
+	Contents interface{}  `json:"contents"`
 }
 
 func ensureDirectory() error {

@@ -35,6 +35,6 @@ func LockfileRun(run func() error) error {
 		}
 	}
 
-	defer lock.Unlock()
+	defer func() { _ = lock.Unlock() }()
 	return run()
 }

@@ -45,10 +45,16 @@ func FindFreeIPsAtIndex(index int, updateRegistry bool) ([]*AllocationResult, er
 			if updateRegistry {
 				if exists, err := registry.HasIP(intfIP); err == nil && !exists && !found {
 					// track IP as free if it hasn't been registered before
-					registry.TrackIP(intfIP)
+					err = registry.TrackIP(intfIP)
+					if err != nil {
+						return freeIps, err
+					}
 				} else if found {
 					// mark IP as in use
-					registry.ForgetIP(intfIP)
+					err = registry.ForgetIP(intfIP)
+					if err != nil {
+						return freeIps, err
+					}
 				}
 			}
 		}

@@ -1,12 +1,13 @@
 package aws
 
 import (
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/lyft/cni-ipvlan-vpc-k8s/aws/cache"
 	"github.com/pkg/errors"
-	"time"
 )
 
 // Subnet contains attributes of a subnet

@@ -14,7 +14,7 @@ func TestDownInterface(t *testing.T) {
 	}
 
 	CreateTestInterface(t, "lyft3")
-	defer RemoveInterface("lyft3")
+	defer func() { _ = RemoveInterface("lyft3") }()
 
 	if err := UpInterface("lyft3"); err != nil {
 		t.Fatalf("Failed to UpInterface lyft3: %v", err)

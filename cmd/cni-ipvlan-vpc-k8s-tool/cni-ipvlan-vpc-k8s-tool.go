@@ -85,7 +85,7 @@ func actionRemoveInterface(c *cli.Context) error {
 
 		if len(interfaces) <= 0 {
 			fmt.Println("please specify an interface")
-			return fmt.Errorf("Insufficent Arguments")
+			return fmt.Errorf("Insufficient Arguments")
 		}
 
 		if err := aws.DefaultClient.RemoveInterface(interfaces); err != nil {
@@ -128,16 +128,11 @@ func actionAllocate(c *cli.Context) error {
 		index := c.Int("index")
 		ipBatchSize := c.Int64("ip_batch_size")
 		res, err := aws.DefaultClient.AllocateIPsFirstAvailableAtIndex(index, ipBatchSize)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
 		for _, alloc := range res {
 			fmt.Printf("allocated %v on %v\n", alloc.IP, alloc.Interface.LocalName())
 		}
 
-		return nil
-
+		return err
 	})
 }
 
@@ -145,7 +140,6 @@ func actionFreeIps(c *cli.Context) error {
 	ips, err := aws.FindFreeIPsAtIndex(0, false)
 	if err != nil {
 		fmt.Println(err)
-		return err
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 	fmt.Fprintln(w, "adapter\tip\t")
@@ -155,7 +149,7 @@ func actionFreeIps(c *cli.Context) error {
 			ip.IP)
 	}
 	w.Flush()
-	return nil
+	return err
 }
 
 func actionLimits(c *cli.Context) error {
@@ -350,17 +344,23 @@ func actionRegistryGc(c *cli.Context) error {
 		}
 
 	OUTER:
-		for _, ip := range ips {
+		for i, ip := range ips {
 			// forget IPs that are actually in use and skip over
 			for _, assignedIP := range assigned {
 				if assignedIP.IPNet.IP.Equal(ip) {
-					reg.ForgetIP(ip)
+					err = reg.ForgetIP(ip)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "failed to forget %v due to %v", ip, err)
+					}
 					continue OUTER
 				}
 			}
-			err := aws.DefaultClient.DeallocateIP(&ip)
+			err := aws.DefaultClient.DeallocateIP(&ips[i])
 			if err == nil {
-				reg.ForgetIP(ip)
+				err = reg.ForgetIP(ip)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "failed to forget %v due to %v", ip, err)
+				}
 				maxReap--
 			} else {
 				fmt.Fprintf(os.Stderr, "Can't deallocate %v due to %v", ip, err)
@@ -505,5 +505,9 @@ func main() {
 	app.Version = version
 	app.Copyright = "(c) 2017-2018 Lyft Inc."
 	app.Usage = "Interface with ENI adapters and CNI bindings for those"
-	app.Run(os.Args)
+	err := app.Run(os.Args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s", err)
+		os.Exit(1)
+	}
 }

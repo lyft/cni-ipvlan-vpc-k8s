@@ -33,7 +33,7 @@ func TestRegistry_Clear(t *testing.T) {
 		t.Fatalf("clear failed %v", err)
 	}
 
-	r.TrackIP(net.ParseIP(IP3))
+	_ = r.TrackIP(net.ParseIP(IP3))
 	if ok, err := r.HasIP(net.ParseIP(IP3)); !ok || err != nil {
 		t.Fatalf("Did not remember IP %v %v %v", IP3, ok, err)
 	}
@@ -56,7 +56,7 @@ func TestRegistry_ForgetIP(t *testing.T) {
 		t.Fatalf("clear failed %v", err)
 	}
 
-	r.TrackIP(net.ParseIP(IP2))
+	_ = r.TrackIP(net.ParseIP(IP2))
 	if ok, err := r.HasIP(net.ParseIP(IP2)); !ok || err != nil {
 		t.Fatalf("Did not remember IP %v %v %v", IP3, ok, err)
 	}
@@ -86,7 +86,7 @@ func TestRegistry_TrackedBefore(t *testing.T) {
 		t.Fatalf("clear failed %v", err)
 	}
 
-	r.TrackIP(net.ParseIP(IP1))
+	_ = r.TrackIP(net.ParseIP(IP1))
 	now := time.Now()
 
 	before, err := r.TrackedBefore(now.Add(100 * time.Hour))

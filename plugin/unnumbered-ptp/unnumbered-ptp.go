@@ -275,7 +275,7 @@ func setupNodePortRule(ifName string, nodePorts string, nodePortMark int) error 
 	exists := false
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
-		return fmt.Errorf("Unable to retrive IP rules %v", err)
+		return fmt.Errorf("Unable to retrieve IP rules %v", err)
 	}
 
 	for _, r := range rules {
@@ -552,7 +552,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	// If the device isn't there then don't try to clean up IP masq either.
 	var (
 		addrs         []netlink.Addr
-		vethPeerIndex int = -1
+		vethPeerIndex = -1
 	)
 	err = ns.WithNetNSPath(args.Netns, func(_ ns.NetNS) error {
 		var err error

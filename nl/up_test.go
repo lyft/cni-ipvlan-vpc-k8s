@@ -15,12 +15,18 @@ func CreateTestInterface(t *testing.T, name string) {
 
 	err := netlink.LinkAdd(lyftBridge)
 	if err != nil {
-		RemoveInterface(name)
 		t.Errorf("Could not add %s: %v", lyftBridge.Name, err)
+		err = RemoveInterface(lyftBridge.Name)
+		if err != nil {
+			t.Errorf("Failed to remove interface %s: %s", lyftBridge.Name, err)
+		}
 	}
 
 	lyft1, _ := netlink.LinkByName(name)
-	netlink.LinkSetMaster(lyft1, lyftBridge)
+	err = netlink.LinkSetMaster(lyft1, lyftBridge)
+	if err != nil {
+		t.Logf("Failed to set link master: %s", err)
+	}
 }
 
 func TestUpInterface(t *testing.T) {
@@ -30,7 +36,7 @@ func TestUpInterface(t *testing.T) {
 	}
 
 	CreateTestInterface(t, "lyft1")
-	defer RemoveInterface("lyft1")
+	defer func() { _ = RemoveInterface("lyft1") }()
 
 	if err := UpInterface("lyft1"); err != nil {
 		t.Fatalf("Failed to UpInterface %v", err)
@@ -44,7 +50,7 @@ func TestUpInterfacePoll(t *testing.T) {
 	}
 
 	CreateTestInterface(t, "lyft2")
-	defer RemoveInterface("lyft2")
+	defer func() { _ = RemoveInterface("lyft2") }()
 
 	if err := UpInterfacePoll("lyft2"); err != nil {
 		t.Fatalf("Failed to failed to stand up interface lyft2")

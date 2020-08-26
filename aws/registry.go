@@ -85,9 +85,11 @@ func (r *Registry) load() (*registryContents, error) {
 		// already existing on all interfaces and timestamped
 		// at the golang epoch
 		free, err := FindFreeIPsAtIndex(0, false)
-		if err == nil {
+		if err == nil || len(free) > 0 {
 			for _, freeAlloc := range free {
-				contents.IPs[freeAlloc.IP.String()] = &registryIP{lib.JSONTime{time.Time{}}}
+				contents.IPs[freeAlloc.IP.String()] = &registryIP{
+					ReleasedOn: lib.JSONTime{Time: time.Time{}},
+				}
 			}
 			err = r.save(&contents)
 			return &contents, err
@@ -153,7 +155,9 @@ func (r *Registry) TrackIPAtEpoch(ip net.IP) error {
 		return err
 	}
 
-	contents.IPs[ip.String()] = &registryIP{lib.JSONTime{time.Time{}}}
+	contents.IPs[ip.String()] = &registryIP{
+		ReleasedOn: lib.JSONTime{Time: time.Time{}},
+	}
 	return r.save(contents)
 }
 
@@ -169,7 +173,9 @@ func (r *Registry) TrackIP(ip net.IP) error {
 		return err
 	}
 
-	contents.IPs[ip.String()] = &registryIP{lib.JSONTime{time.Now()}}
+	contents.IPs[ip.String()] = &registryIP{
+		ReleasedOn: lib.JSONTime{Time: time.Now()},
+	}
 	return r.save(contents)
 }
 
