@@ -124,7 +124,7 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 			// continue on.
 			continue
 		}
-		for _, intf := range newInterfaces {
+		for i, intf := range newInterfaces {
 			if intf.Mac == *resp.NetworkInterface.MacAddress {
 				registry := &Registry{}
 				// Timestamp the addition of all the new IPs in the registry.
@@ -135,8 +135,8 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 				}
 				// Interfaces are sorted by device number. The first one is the main one
 				mainIf := newInterfaces[0].IfName
-				configureInterface(&intf, mainIf)
-				return &intf, nil
+				configureInterface(&newInterfaces[i], mainIf)
+				return &newInterfaces[i], nil
 			}
 		}
 

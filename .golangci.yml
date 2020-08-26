@@ -23,3 +23,7 @@ linters-settings:
 
 run:
   deadline: 1m
+
+issues:
+  exclude:
+    - G404 # crypto rand warning, we don't need secure random numbers

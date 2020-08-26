@@ -344,7 +344,7 @@ func actionRegistryGc(c *cli.Context) error {
 		}
 
 	OUTER:
-		for _, ip := range ips {
+		for i, ip := range ips {
 			// forget IPs that are actually in use and skip over
 			for _, assignedIP := range assigned {
 				if assignedIP.IPNet.IP.Equal(ip) {
@@ -355,7 +355,7 @@ func actionRegistryGc(c *cli.Context) error {
 					continue OUTER
 				}
 			}
-			err := aws.DefaultClient.DeallocateIP(&ip)
+			err := aws.DefaultClient.DeallocateIP(&ips[i])
 			if err == nil {
 				err = reg.ForgetIP(ip)
 				if err != nil {
