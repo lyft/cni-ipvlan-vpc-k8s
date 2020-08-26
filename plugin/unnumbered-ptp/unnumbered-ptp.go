@@ -552,7 +552,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	// If the device isn't there then don't try to clean up IP masq either.
 	var (
 		addrs         []netlink.Addr
-		vethPeerIndex int = -1
+		vethPeerIndex = -1
 	)
 	err = ns.WithNetNSPath(args.Netns, func(_ ns.NetNS) error {
 		var err error

@@ -4,10 +4,8 @@ language:
   - go
 
 go:
-  - "1.13"
-  
+  - "1.14"
+
 script:
   - which go
   - sudo env PATH=$PATH make ci
-
-  

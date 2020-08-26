@@ -47,6 +47,6 @@ interactive-docker: test-docker
 
 .PHONY: ci
 ci:
-	go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.18.0
+	go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.30.0
 	$(MAKE) all
 	$(MAKE) lint
