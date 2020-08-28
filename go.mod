@@ -21,10 +21,10 @@ require (
 	github.com/nightlyone/lockfile v0.0.0-20180618180623-0ad87eef1443
 	github.com/pkg/errors v0.9.1
 	github.com/urfave/cli v1.20.0
-	github.com/vishvananda/netlink v1.0.0
-	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc
+	github.com/vishvananda/netlink v1.1.1-0.20200603190939-5a869a71f0cb
+	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
 	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
-	golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
+	golang.org/x/sys v0.0.0-20200121082415-34d275377bf9
 	gopkg.in/alecthomas/gometalinter.v2 v2.0.12 // indirect
 	gopkg.in/alecthomas/kingpin.v3-unstable v3.0.0-20180810215634-df19058c872c // indirect
 )
