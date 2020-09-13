@@ -66,13 +66,15 @@ type PluginConf struct {
 	RawPrevResult *map[string]interface{} `json:"prevResult"`
 	PrevResult    *current.Result         `json:"-"`
 
-	IPMasq             bool   `json:"ipMasq"`
-	HostInterface      string `json:"hostInterface"`
-	ContainerInterface string `json:"containerInterface"`
-	MTU                int    `json:"mtu"`
-	TableStart         int    `json:"routeTableStart"`
-	NodePortMark       int    `json:"nodePortMark"`
-	NodePorts          string `json:"nodePorts"`
+	IPMasq               bool     `json:"ipMasq"`
+	HostInterface        string   `json:"hostInterface"`
+	ContainerInterface   string   `json:"containerInterface"`
+	MTU                  int      `json:"mtu"`
+	TableStart           int      `json:"routeTableStart"`
+	DefaultRouteToVPC    bool     `json:"defaultRouteToVpc"`
+	ExtraContainerRoutes []string `json:"extraContainerRoutes"`
+	NodePortMark         int      `json:"nodePortMark"`
+	NodePorts            string   `json:"nodePorts"`
 }
 
 // parseConfig parses the supplied configuration (and prevResult) from stdin.
@@ -184,7 +186,7 @@ func findFreeTable(start int) (int, error) {
 	return -1, fmt.Errorf("failed to find free route table")
 }
 
-func addPolicyRules(veth *net.Interface, ipc *current.IPConfig, routes []*types.Route, tableStart int) error {
+func addPolicyRules(veth *net.Interface, ipc *current.IPConfig, routes []*types.Route, tableStart int, defaultRouteToVpc bool, netns ns.NetNS, hostIfName string) error {
 	table := -1
 
 	// depend on netlink atomicity to win races for table slots on initial route add
@@ -238,6 +240,28 @@ func addPolicyRules(veth *net.Interface, ipc *current.IPConfig, routes []*types.
 	err := netlink.RuleAdd(rule)
 	if err != nil {
 		return fmt.Errorf("failed to add policy rule %v: %v", rule, err)
+	}
+
+	if defaultRouteToVpc {
+		err = netns.Do(func(_ ns.NetNS) error {
+			hostIf, err := net.InterfaceByName(hostIfName)
+			if err != nil {
+				return fmt.Errorf("failed to look up %q: %v", hostIfName, err)
+			}
+			err = netlink.RouteAdd(&netlink.Route{
+				LinkIndex: hostIf.Index,
+				Dst:       nil,
+				Gw:        routes[0].GW,
+				Scope:     netlink.SCOPE_UNIVERSE,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to add default route via %v: %v", routes[0].GW, err)
+			}
+			return nil
+		})
+	}
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -294,7 +318,7 @@ func setupNodePortRule(ifName string, nodePorts string, nodePortMark int) error 
 	return nil
 }
 
-func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netlink.Addr, masq, containerIPV4, containerIPV6 bool, k8sIfName string, pr *current.Result) (*current.Interface, *current.Interface, error) {
+func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netlink.Addr, masq, containerIPV4, containerIPV6 bool, k8sIfName string, defaultRouteToVpc bool, extraContainerRoutes []string, pr *current.Result) (*current.Interface, *current.Interface, error) {
 	hostInterface := &current.Interface{}
 	containerInterface := &current.Interface{}
 
@@ -352,15 +376,33 @@ func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netl
 			}
 		}
 
+		for _, route := range extraContainerRoutes {
+			_, dstNet, err := net.ParseCIDR(route)
+			if err != nil {
+				return fmt.Errorf("failed to add extra container route: %v", err)
+			}
+			err = netlink.RouteAdd(&netlink.Route{
+				LinkIndex: contVeth.Index,
+				Dst:       dstNet,
+				Gw:        hostAddrs[0].IP,
+			})
+
+			if err != nil {
+				return fmt.Errorf("failed to add host route dst %v: %v", dstNet, err)
+			}
+
+		}
 		// add a default gateway pointed at the first hostAddr
-		err = netlink.RouteAdd(&netlink.Route{
-			LinkIndex: contVeth.Index,
-			Scope:     netlink.SCOPE_UNIVERSE,
-			Dst:       nil,
-			Gw:        hostAddrs[0].IP,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to add default route %v: %v", hostAddrs[0].IP, err)
+		if !defaultRouteToVpc {
+			err = netlink.RouteAdd(&netlink.Route{
+				LinkIndex: contVeth.Index,
+				Scope:     netlink.SCOPE_UNIVERSE,
+				Dst:       nil,
+				Gw:        hostAddrs[0].IP,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to add default route %v: %v", hostAddrs[0].IP, err)
+			}
 		}
 
 		// Send a gratuitous arp for all borrowed v4 addresses
@@ -378,7 +420,7 @@ func setupContainerVeth(netns ns.NetNS, ifName string, mtu int, hostAddrs []netl
 	return hostInterface, containerInterface, nil
 }
 
-func setupHostVeth(vethName string, hostAddrs []netlink.Addr, masq bool, tableStart int, result *current.Result) error {
+func setupHostVeth(vethName string, hostAddrs []netlink.Addr, masq bool, tableStart int, defaultRouteToVpc bool, netns ns.NetNS, hostIfName string, result *current.Result) error {
 	// no IPs to route
 	if len(result.IPs) == 0 {
 		return nil
@@ -412,7 +454,7 @@ func setupHostVeth(vethName string, hostAddrs []netlink.Addr, masq bool, tableSt
 	}
 
 	// add policy rules for traffic coming in from Pods and destined for the VPC
-	err = addPolicyRules(veth, result.IPs[0], result.Routes, tableStart)
+	err = addPolicyRules(veth, result.IPs[0], result.Routes, tableStart, defaultRouteToVpc, netns, hostIfName)
 	if err != nil {
 		return fmt.Errorf("failed to add policy rules: %v", err)
 	}
@@ -492,12 +534,12 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	hostInterface, _, err := setupContainerVeth(netns, conf.ContainerInterface, conf.MTU,
-		hostAddrs, conf.IPMasq, containerIPV4, containerIPV6, args.IfName, conf.PrevResult)
+		hostAddrs, conf.IPMasq, containerIPV4, containerIPV6, args.IfName, conf.DefaultRouteToVPC, conf.ExtraContainerRoutes, conf.PrevResult)
 	if err != nil {
 		return err
 	}
 
-	if err = setupHostVeth(hostInterface.Name, hostAddrs, conf.IPMasq, conf.TableStart, conf.PrevResult); err != nil {
+	if err = setupHostVeth(hostInterface.Name, hostAddrs, conf.IPMasq, conf.TableStart, conf.DefaultRouteToVPC, netns, conf.HostInterface, conf.PrevResult); err != nil {
 		return err
 	}
 
