@@ -15,6 +15,22 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: 1.14.0
+      - name: go mod cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-mod-
+      - name: go build cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-build-
       - run: make build
 
   test:
