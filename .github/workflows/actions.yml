@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: 1.14.0
-      - run: make test
+      - run: sudo make test
 
   lint:
     runs-on: ubuntu-latest
