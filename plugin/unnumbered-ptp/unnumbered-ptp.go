@@ -138,7 +138,7 @@ func enableForwarding(ipv4 bool, ipv6 bool) error {
 	if ipv4 {
 		err := ip.EnableIP4Forward()
 		if err != nil {
-			return fmt.Errorf("Could not enable IPv6 forwarding: %v", err)
+			return fmt.Errorf("Could not enable IPv4 forwarding: %v", err)
 		}
 	}
 	if ipv6 {
