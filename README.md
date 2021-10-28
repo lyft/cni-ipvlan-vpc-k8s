@@ -275,6 +275,9 @@ available:
    to enumerate all peered VPCs. Routes will be added so connections
    to these VPCs will be sourced from the IPvlan adapter in the pod
    and not through the host masquerade.
+ - `routeToCidrs`: List of CIDRs. Routes will be added so connections
+   to these CIDRs will be sourced from the IPvlan adapter in the pod
+   and not through the host masquerade.
 - `reuseIPWait`: Seconds to wait before free IP addresses are made
    available for reuse by Pods. Defaults to 60 seconds. `reuseIPWait`
    functions as both a lock to prevent addresses from being grabbed by
