@@ -47,6 +47,7 @@ type PluginConf struct {
 	RouteToVPCPeers  bool              `json:"routeToVpcPeers"`
 	ReuseIPWait      int               `json:"reuseIPWait"`
 	IPBatchSize      int64             `json:"ipBatchSize"`
+	RouteToCidrs     []string          `json:"routeToCidrs"`
 }
 
 func init() {
@@ -184,6 +185,16 @@ func cmdAdd(args *skel.CmdArgs) error {
 			return fmt.Errorf("unable to enumerate peer CIDrs %v", err)
 		}
 		cidrs = append(cidrs, peerCidr...)
+	}
+
+	if conf.RouteToCidrs != nil {
+		for _, cidr := range conf.RouteToCidrs {
+			_, parsed, err := net.ParseCIDR(cidr)
+			if err != nil {
+				return fmt.Errorf("unable to parse routeToCidrs element %v", err)
+			}
+			cidrs = append(cidrs, parsed)
+		}
 	}
 
 	// add routes for all VPC cidrs via the subnet gateway
