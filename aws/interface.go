@@ -47,6 +47,13 @@ func (c *interfaceClient) NewInterfaceOnSubnetAtIndex(index int, secGrps []strin
 	}
 
 	createReq := &ec2.CreateNetworkInterfaceInput{}
+	tagSpec := &ec2.TagSpecification{}
+	tagSpec.SetResourceType(ec2.ResourceTypeNetworkInterface)
+	tag := &ec2.Tag{}
+	tag.SetKey("lyft.net/createTime")
+	tag.SetValue(time.Now().Format(time.RFC3339))
+	tagSpec.SetTags([]*ec2.Tag{tag})
+	createReq.SetTagSpecification([]*ec2.TagSpecification{tagSpec})
 	createReq.SetDescription(fmt.Sprintf("CNI-ENI %v", idDoc.InstanceID))
 	secGrpsPtr := []*string{}
 	for _, grp := range secGrps {
