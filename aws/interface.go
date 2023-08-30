@@ -2,6 +2,8 @@ package aws
 
 import (
 	"fmt"
+	"hash/fnv"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -10,7 +12,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-
 	"github.com/lyft/cni-ipvlan-vpc-k8s/nl"
 )
 
@@ -198,17 +199,35 @@ OUTER:
 				continue OUTER
 			}
 		}
-		availableSubnets = append(availableSubnets, newSubnet)
+		// only add subnets that have available space
+		if newSubnet.AvailableAddressCount > 0 {
+			availableSubnets = append(availableSubnets, newSubnet)
+		}
 	}
-
-	// assign new interfaces to subnets with most available addresses
-	sort.Sort(SubnetsByAvailableAddressCount(availableSubnets))
 
 	if len(availableSubnets) <= 0 {
 		return nil, fmt.Errorf("No subnets are available which haven't already been used")
 	}
 
-	return c.NewInterfaceOnSubnetAtIndex(len(existingInterfaces), secGrps, availableSubnets[0], ipBatchSize)
+	idDoc, err := c.aws.getIDDoc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get instanceID to pick a subnet: %w", err)
+	}
+
+	// we hash the instance id so that all instances pick a different
+	// subnet to associate with the ENI
+	h := fnv.New32a()
+	// skip errors because New32a never fails
+	_, _ = io.WriteString(h, idDoc.InstanceID)
+	// we also hash the time so that any retries that happen later may
+	// try to pick another subnet, we unfortunately don't have a retry
+	// count accessible at the moment
+	_, _ = io.WriteString(h, time.Now().Format(time.RFC3339))
+
+	sort.Sort(SubnetsByID(availableSubnets))
+	subnet := availableSubnets[h.Sum32()%uint32(len(availableSubnets))]
+
+	return c.NewInterfaceOnSubnetAtIndex(len(existingInterfaces), secGrps, subnet, ipBatchSize)
 }
 
 // RemoveInterface graceful shutdown and removal of interfaces

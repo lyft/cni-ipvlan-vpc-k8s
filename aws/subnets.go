@@ -20,7 +20,8 @@ type Subnet struct {
 	Tags                  map[string]string
 }
 
-// SubnetsByAvailableAddressCount contains a list of subnet
+// SubnetsByAvailableAddressCount is a list of subnets sorted by
+// currently available addresses
 type SubnetsByAvailableAddressCount []Subnet
 
 func (a SubnetsByAvailableAddressCount) Len() int      { return len(a) }
@@ -28,6 +29,13 @@ func (a SubnetsByAvailableAddressCount) Swap(i, j int) { a[i], a[j] = a[j], a[i]
 func (a SubnetsByAvailableAddressCount) Less(i, j int) bool {
 	return a[i].AvailableAddressCount > a[j].AvailableAddressCount
 }
+
+// SubnetsByID is a list of subnets sorted by ID
+type SubnetsByID []Subnet
+
+func (a SubnetsByID) Len() int           { return len(a) }
+func (a SubnetsByID) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a SubnetsByID) Less(i, j int) bool { return a[i].ID < a[j].ID }
 
 // SubnetsClient provides information about VPC subnets
 type SubnetsClient interface {
